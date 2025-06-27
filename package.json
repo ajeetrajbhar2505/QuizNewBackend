@@ -1,0 +1,26 @@
+{
+  "name": "desktop",
+  "version": "0.0.1",
+  "description": "Built with Node.js, Express, Socket.io, and Sequelize for a seamless realtime experience. Perfect for trivia lovers, educators, and competitive players!",
+  "main": "app.js",
+  "scripts": {
+    "test": "node --test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ajeetrajbhar2505/QuizNewBackend.git"
+  },
+  "keywords": [
+    "node"
+  ],
+  "author": "ajeet rajbhar",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/ajeetrajbhar2505/QuizNewBackend/issues"
+  },
+  "homepage": "https://github.com/ajeetrajbhar2505/QuizNewBackend#readme",
+  "dependencies": {
+    "fs": "^0.0.1-security",
+    "path": "^0.12.7"
+  }
+}
