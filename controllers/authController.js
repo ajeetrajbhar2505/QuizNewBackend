@@ -1,12 +1,10 @@
 const authService = require('../services/authService');
 const logger = require('../config/logger');
-const { getIO } = require('../config/socket');
 
 const register = async (socket, data) => {
   try {
     const { email, password, name } = data;
     const { user, token } = await authService.registerUser(email, password, name);
-    
     socket.emit('auth:register:success', { user, token });
     logger.info(`User registered: ${email}`);
   } catch (error) {
@@ -19,12 +17,33 @@ const login = async (socket, data) => {
   try {
     const { email, password } = data;
     const { user, token } = await authService.loginUser(email, password);
-    
     socket.emit('auth:login:success', { user, token });
     logger.info(`User logged in: ${email}`);
   } catch (error) {
     socket.emit('auth:login:error', { error: error.message });
     logger.error(`Login error: ${error.message}`);
+  }
+};
+
+const googleLogin = async (socket, token) => {
+  try {
+    const { user, token: authToken } = await authService.googleLogin(token);
+    socket.emit('auth:google:success', { user, token: authToken });
+    logger.info(`Google login successful: ${user.email}`);
+  } catch (error) {
+    socket.emit('auth:google:error', { error: error.message });
+    logger.error(`Google login error: ${error.message}`);
+  }
+};
+
+const facebookLogin = async (socket, token) => {
+  try {
+    const { user, token: authToken } = await authService.facebookLogin(token);
+    socket.emit('auth:facebook:success', { user, token: authToken });
+    logger.info(`Facebook login successful: ${user.email}`);
+  } catch (error) {
+    socket.emit('auth:facebook:error', { error: error.message });
+    logger.error(`Facebook login error: ${error.message}`);
   }
 };
 
@@ -52,6 +71,8 @@ const me = async (socket) => {
 module.exports = {
   register,
   login,
+  googleLogin,
+  facebookLogin,
   logout,
   me,
 };

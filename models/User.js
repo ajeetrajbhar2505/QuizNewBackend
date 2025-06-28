@@ -2,11 +2,14 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
 const userSchema = new mongoose.Schema({
-  name: { type: String, required: true },
+  name: { type: String },
   email: { type: String, required: true, unique: true },
-  password: { type: String, required: true },
-  role: { type: String, enum: ['user', 'admin'], default: 'user' },
+  password: { type: String },
+  googleId: { type: String },
+  facebookId: { type: String },
   avatar: { type: String },
+  isVerified: { type: Boolean, default: false },
+  role: { type: String, enum: ['user', 'admin'], default: 'user' },
   friends: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   badges: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Badge' }],
   createdAt: { type: Date, default: Date.now },
@@ -14,7 +17,7 @@ const userSchema = new mongoose.Schema({
 });
 
 userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
+  if (!this.isModified('password') || !this.password) return next();
   this.password = await bcrypt.hash(this.password, 12);
   next();
 });
