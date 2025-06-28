@@ -1,0 +1,58 @@
+const quizService = require('../services/quizService');
+const logger = require('../config/logger');
+const { getIO } = require('../config/socket');
+
+const createQuiz = async (socket, data) => {
+  try {
+    const quiz = await quizService.createQuiz(data, socket.user.id);
+    socket.emit('quiz:create:success', { quiz });
+    logger.info(`Quiz created by user ${socket.user.id}`);
+  } catch (error) {
+    socket.emit('quiz:create:error', { error: error.message });
+    logger.error(`Quiz creation error: ${error.message}`);
+  }
+};
+
+const getQuiz = async (socket, quizId) => {
+  try {
+    const quiz = await quizService.getQuizById(quizId);
+    socket.emit('quiz:get:success', { quiz });
+  } catch (error) {
+    socket.emit('quiz:get:error', { error: error.message });
+    logger.error(`Get quiz error: ${error.message}`);
+  }
+};
+
+const startQuiz = async (socket, quizId) => {
+  try {
+    const activeQuiz = await quizService.startQuiz(quizId, socket.user.id);
+    getIO().to(`quiz_${quizId}`).emit('quiz:start:success', { activeQuiz });
+    logger.info(`Quiz ${quizId} started by user ${socket.user.id}`);
+  } catch (error) {
+    socket.emit('quiz:start:error', { error: error.message });
+    logger.error(`Start quiz error: ${error.message}`);
+  }
+};
+
+const submitAnswer = async (socket, { quizId, questionId, answer }) => {
+  try {
+    const result = await quizService.submitAnswer(
+      quizId,
+      questionId,
+      answer,
+      socket.user.id
+    );
+    socket.emit('quiz:answer:success', { result });
+    logger.info(`Answer submitted by user ${socket.user.id}`);
+  } catch (error) {
+    socket.emit('quiz:answer:error', { error: error.message });
+    logger.error(`Answer submission error: ${error.message}`);
+  }
+};
+
+module.exports = {
+  createQuiz,
+  getQuiz,
+  startQuiz,
+  submitAnswer,
+};

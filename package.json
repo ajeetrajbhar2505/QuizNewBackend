@@ -1,10 +1,12 @@
 {
-  "name": "desktop",
-  "version": "0.0.1",
-  "description": "Built with Node.js, Express, Socket.io, and Sequelize for a seamless realtime experience. Perfect for trivia lovers, educators, and competitive players!",
+  "name": "quiz-app-socket",
+  "version": "1.0.0",
+  "description": "A real-time quiz application using WebSockets",
   "main": "app.js",
   "scripts": {
-    "test": "node --test"
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "test": "jest"
   },
   "repository": {
     "type": "git",
@@ -20,7 +22,19 @@
   },
   "homepage": "https://github.com/ajeetrajbhar2505/QuizNewBackend#readme",
   "dependencies": {
-    "fs": "^0.0.1-security",
-    "path": "^0.12.7"
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.0",
+    "mongoose": "^7.0.3",
+    "nodemailer": "^6.9.1",
+    "openai": "^4.0.0",
+    "socket.io": "^4.6.1",
+    "stripe": "^12.1.1",
+    "winston": "^3.8.2"
+  },
+  "devDependencies": {
+    "jest": "^29.3.1",
+    "nodemon": "^2.0.20"
   }
 }
