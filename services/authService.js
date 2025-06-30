@@ -20,11 +20,8 @@ const transporter = nodemailer.createTransport({
   }
 });
 
-const googleClient = new OAuth2Client(
-  process.env.GOOGLE_CLIENT_ID,
-  process.env.GOOGLE_CLIENT_SECRET,
-  process.env.GOOGLE_REDIRECT_URL
-);
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID, process.env.GOOGLE_CLIENT_SECRET, process.env.GOOGLE_REDIRECT_URL);
+
 
 const registerUser = async (userData) => {
   const { name, email, password } = userData;
@@ -70,13 +67,16 @@ const logoutUser = async (userId) => {
   await user.save();
 };
 
-const generateGoogleAuthUrl = () => {
-  return `https://accounts.google.com/o/oauth2/v2/auth?` +
-    `client_id=${process.env.GOOGLE_CLIENT_ID}&` +
-    `redirect_uri=${encodeURIComponent(process.env.GOOGLE_REDIRECT_URL)}&` +
-    `response_type=code&` +
-    `scope=profile email&` +
-    `access_type=offline`;
+const generateGoogleAuthUrl = async () => {
+  try {
+    return  await googleClient.generateAuthUrl({
+      access_type: 'offline',  // Use 'offline' to get refresh token (optional)
+      scope: ['https://www.googleapis.com/auth/userinfo.profile', 'https://www.googleapis.com/auth/userinfo.email'], // Requested scopes
+  });
+  } catch (error) {
+    return error
+  }
+
 };
 
 const generateFacebookAuthUrl = () => {
