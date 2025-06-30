@@ -42,7 +42,7 @@ class SocketClient {
       if (response.authResponse) {
         this.facebookLogin(response.authResponse.accessToken);
       }
-    }, {scope: 'public_profile,email'});
+    }, { scope: 'public_profile,email' });
   }
 
   // Authentication methods
@@ -72,7 +72,35 @@ class SocketClient {
   }
 
   // Event handlers
-  setupEventListeners() {
+  setupEventListeners() {// Auth events
+    this.socket
+      .on('auth:register:success', this.handleRegisterSuccess.bind(this))
+      .on('auth:register:error', this.handleRegisterError.bind(this))
+
+      .on('auth:login:success', this.handleLoginSuccess.bind(this))
+      .on('auth:login:error', this.handleLoginError.bind(this))
+
+      .on('auth:logout:success', this.handleLogoutSuccess.bind(this))
+      .on('auth:logout:error', this.handleLogoutError.bind(this))
+
+      .on('auth:google:url', this.handleGoogleAuthUrl.bind(this))
+      .on('auth:google:success', this.handleGoogleLoginSuccess.bind(this))
+      .on('auth:google:error', this.handleGoogleLoginError.bind(this))
+
+      .on('auth:facebook:url', this.handleFacebookAuthUrl.bind(this))
+      .on('auth:facebook:success', this.handleFacebookLoginSuccess.bind(this))
+      .on('auth:facebook:error', this.handleFacebookLoginError.bind(this))
+
+      .on('auth:otp:send:success', this.handleOtpSendSuccess.bind(this))
+      .on('auth:otp:send:error', this.handleOtpSendError.bind(this))
+
+      .on('auth:otp:verify:success', this.handleOtpVerifySuccess.bind(this))
+      .on('auth:otp:verify:error', this.handleOtpVerifyError.bind(this))
+
+      .on('auth:me:success', this.handleCurrentUserSuccess.bind(this))
+      .on('auth:me:error', this.handleCurrentUserError.bind(this))
+
+      .on('receiveLogin', this.handleReceiveLogin.bind(this));
     this.socket.on('connect', () => {
       console.log('Connected to socket server');
     });
@@ -81,56 +109,6 @@ class SocketClient {
       console.log('Disconnected from socket server');
     });
 
-    // Auth events
-    this.socket.on('auth:register:success', this.handleRegisterSuccess.bind(this));
-    this.socket.on('auth:register:error', this.handleRegisterError.bind(this));
-    this.socket.on('auth:login:success', this.handleLoginSuccess.bind(this));
-    this.socket.on('auth:login:error', this.handleLoginError.bind(this));
-    this.socket.on('auth:google:success', this.handleGoogleLoginSuccess.bind(this));
-    this.socket.on('auth:google:error', this.handleGoogleLoginError.bind(this));
-    this.socket.on('auth:facebook:success', this.handleFacebookLoginSuccess.bind(this));
-    this.socket.on('auth:facebook:error', this.handleFacebookLoginError.bind(this));
-    this.socket.on('auth:logout:success', this.handleLogoutSuccess.bind(this));
-    this.socket.on('auth:me:success', this.handleCurrentUserSuccess.bind(this));
-  }
 
-  handleRegisterSuccess(data) {
-    localStorage.setItem('token', data.token);
-    console.log('Registration successful', data.user);
-    // Update UI or redirect
   }
-
-  handleLoginSuccess(data) {
-    localStorage.setItem('token', data.token);
-    console.log('Login successful', data.user);
-    // Update UI or redirect
-  }
-
-  handleGoogleLoginSuccess(data) {
-    localStorage.setItem('token', data.token);
-    console.log('Google login successful', data.user);
-    // Update UI or redirect
-  }
-
-  handleFacebookLoginSuccess(data) {
-    localStorage.setItem('token', data.token);
-    console.log('Facebook login successful', data.user);
-    // Update UI or redirect
-  }
-
-  // ... other handler methods
 }
-
-// Initialize when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-  window.socketClient = new SocketClient();
-  
-  // Add click handlers for auth buttons
-  document.getElementById('googleSignInButton')?.addEventListener('click', () => {
-    google.accounts.id.prompt();
-  });
-  
-  document.getElementById('fb-login-button')?.addEventListener('click', () => {
-    window.socketClient.handleFacebookSignIn();
-  });
-});

@@ -14,12 +14,30 @@ const register = async (socket, data) => {
 
 const login = async (socket, data) => {
   try {
-    const result = await authService.loginUser(data.email, data.password);
+    const sessionInfo = {
+      ipAddress: socket.handshake.address,
+      userAgent: socket.handshake.headers['user-agent']
+    };
+    const result = await authService.loginUser(data.email, data.password, sessionInfo);
     socket.emit('auth:login:success', result);
     logger.info(`User logged in: ${data.email}`);
   } catch (error) {
     socket.emit('auth:login:error', { message: error.message });
     logger.error(`Login error: ${error.message}`);
+  }
+};
+
+const logout = async (socket) => {
+  try {
+    const userId = socket.user?._id;
+    if (userId) {
+      await authService.logoutUser(userId);
+      socket.emit('auth:logout:success');
+      logger.info(`User logged out: ${userId}`);
+    }
+  } catch (error) {
+    socket.emit('auth:logout:error', { message: error.message });
+    logger.error(`Logout error: ${error.message}`);
   }
 };
 
@@ -37,22 +55,24 @@ const googleLogin = async (socket) => {
 const facebookLogin = async (socket) => {
   try {
     const url = await authService.generateFacebookAuthUrl();
-    socket.emit('auth:google:url', { url });
-    logger.info('Google auth URL generated');
+    socket.emit('auth:facebook:url', { url });
+    logger.info('Facebook auth URL generated');
   } catch (error) {
-    socket.emit('auth:google:error', { message: error.message });
-    logger.error(`Google auth error: ${error.message}`);
+    socket.emit('auth:facebook:error', { message: error.message });
+    logger.error(`Facebook auth error: ${error.message}`);
   }
 };
 
 const googleCallback = async (socket, code) => {
   try {
-    const { token, user } = await authService.handleGoogleCallback(code);
+    const sessionInfo = {
+      ipAddress: socket.handshake.address,
+      userAgent: socket.handshake.headers['user-agent']
+    };
+    const { token, user } = await authService.handleGoogleCallback(code, sessionInfo);
     
-    // Emit to the specific socket
     socket.emit('auth:google:success', { token, user });
     
-    // Broadcast to all sockets if needed
     const io = require('../socket').getIO();
     io.emit('receiveLogin', { token });
     
@@ -65,16 +85,18 @@ const googleCallback = async (socket, code) => {
 
 const facebookCallback = async (socket, code) => {
   try {
-    const { token, user } = await authService.handleFacebookCallback(code);
+    const sessionInfo = {
+      ipAddress: socket.handshake.address,
+      userAgent: socket.handshake.headers['user-agent']
+    };
+    const { token, user } = await authService.handleFacebookCallback(code, sessionInfo);
     
-    // Emit to the specific socket
     socket.emit('auth:facebook:success', { token, user });
     
-    // Broadcast to all sockets if needed
     const io = require('../socket').getIO();
     io.emit('receiveLogin', { token });
     
-    logger.info(`Facebook login successful for user: ${user.username}`);
+    logger.info(`Facebook login successful for user: ${user.name}`);
   } catch (error) {
     socket.emit('auth:facebook:error', { 
       message: error.message || 'Facebook authentication failed' 
@@ -96,7 +118,11 @@ const sendOTP = async (socket, email) => {
 
 const verifyOTP = async (socket, data) => {
   try {
-    const result = await authService.verifyOtp(data.email, data.otp);
+    const sessionInfo = {
+      ipAddress: socket.handshake.address,
+      userAgent: socket.handshake.headers['user-agent']
+    };
+    const result = await authService.verifyOtp(data.email, data.otp, sessionInfo);
     socket.emit('auth:otp:verify:success', result);
     logger.info(`OTP verified for: ${data.email}`);
   } catch (error) {
@@ -108,6 +134,7 @@ const verifyOTP = async (socket, data) => {
 module.exports = {
   register,
   login,
+  logout,
   googleLogin,
   facebookLogin,
   googleCallback,
