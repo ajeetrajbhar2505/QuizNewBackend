@@ -13,7 +13,7 @@ const setupPaymentRoutes = require('./routes/paymentRoutes');
 const setupAiQuizRoutes = require('./routes/aiQuizRoutes');
 const setupNotificationRoutes = require('./routes/notificationRoutes');
 const setupDashboardRoutes = require('./routes/dashboardRoutes');
-
+const oauthRoutes = require('./routes/oauthRoutes');
 // Initialize Express app
 const app = express();
 const server = http.createServer(app);
@@ -24,6 +24,7 @@ connectDB();
 // Middleware
 app.use(express.json());
 app.use(express.static('public'));
+app.use(oauthRoutes);
 
 // Initialize Socket.io
 const io = initSocket(server);
