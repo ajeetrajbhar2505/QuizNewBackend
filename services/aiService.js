@@ -26,15 +26,27 @@ const generateQuiz = async (topic) => {
       model: 'gpt-3.5-turbo',
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.7,
+      response_format: { type: "json_object" } // Ensure JSON output
     });
 
     const content = response.choices[0].message.content;
+    
+    // Add validation for the response
+    if (!content) {
+      throw new Error('Empty response from AI service');
+    }
+
     const quizData = JSON.parse(content);
+    
+    // Basic validation of quiz structure
+    if (!quizData.questions || !Array.isArray(quizData.questions)) {
+      throw new Error('Invalid quiz format received from AI');
+    }
     
     return quizData;
   } catch (error) {
     logger.error('AI quiz generation error:', error);
-    throw new Error('Failed to generate quiz');
+    throw new Error('Failed to generate quiz: ' + error.message);
   }
 };
 
