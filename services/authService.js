@@ -80,13 +80,8 @@ const generateGoogleAuthUrl = async () => {
 };
 
 const generateFacebookAuthUrl = () => {
-  return `https://www.facebook.com/v19.0/dialog/oauth?` +
-    `client_id=${process.env.FACEBOOK_APP_ID}&` +
-    `redirect_uri=${encodeURIComponent(process.env.FACEBOOK_REDIRECT_URI)}&` +
-    `response_type=code&` +
-    `scope=public_profile,email&` +
-    `auth_type=rerequest`;
-};
+  return `https://www.facebook.com/v19.0/dialog/oauth?client_id=${process.env.FACEBOOK_APP_ID}&redirect_uri=${encodeURIComponent(process.env.REDIRECT_URI)}&scope=email,public_profile&response_type=code&auth_type=rerequest`;
+``};
 
 const handleGoogleCallback = async (code, sessionInfo) => {
   try {
