@@ -69,10 +69,10 @@ const logoutUser = async (userId) => {
 
 const generateGoogleAuthUrl = async () => {
   try {
-    return  await googleClient.generateAuthUrl({
+    return await googleClient.generateAuthUrl({
       access_type: 'offline',  // Use 'offline' to get refresh token (optional)
       scope: ['https://www.googleapis.com/auth/userinfo.profile', 'https://www.googleapis.com/auth/userinfo.email'], // Requested scopes
-  });
+    });
   } catch (error) {
     return error
   }
@@ -81,7 +81,8 @@ const generateGoogleAuthUrl = async () => {
 
 const generateFacebookAuthUrl = () => {
   return `https://www.facebook.com/v19.0/dialog/oauth?client_id=${process.env.FACEBOOK_APP_ID}&redirect_uri=${encodeURIComponent(process.env.REDIRECT_URI)}&scope=email,public_profile&response_type=code&auth_type=rerequest`;
-``};
+  ``
+};
 
 const handleGoogleCallback = async (code, sessionInfo) => {
   try {
@@ -129,35 +130,41 @@ const handleGoogleCallback = async (code, sessionInfo) => {
 
 const handleFacebookCallback = async (code, sessionInfo) => {
   try {
-    const tokenUrl = `https://graph.facebook.com/v19.0/oauth/access_token?` + 
-      querystring.stringify({
-        client_id: process.env.FACEBOOK_APP_ID,
-        client_secret: process.env.FACEBOOK_APP_SECRET,
-        redirect_uri: process.env.FACEBOOK_REDIRECT_URI,
-        code: code
-      });
 
-    const tokenRes = await axios.get(tokenUrl);
-    const tokenData = tokenRes.data;
+    const tokenUrl = `https://graph.facebook.com/v19.0/oauth/access_token?` + querystring.stringify({
+      client_id: process.env.FACEBOOK_APP_ID,
+      client_secret: process.env.FACEBOOK_APP_SECRET,
+      redirect_uri: process.env.REDIRECT_URI,
+      code: code
+    });
+
+
+    const tokenRes = await fetch(tokenUrl);
+    const tokenData = await tokenRes.json();
 
     if (!tokenData.access_token) {
-      throw new Error('Failed to get Facebook access token');
+      return res.status(400).json({ message: 'Failed to get access token', details: tokenData });
     }
 
-    const profileUrl = `https://graph.facebook.com/me?` + 
-      querystring.stringify({
-        fields: 'id,name,email,picture',
-        access_token: tokenData.access_token
-      });
+    const accessToken = tokenData.access_token;
 
-    const profileRes = await axios.get(profileUrl);
-    const profileData = profileRes.data;
+    // Step 2: Fetch user profile
+    const profileUrl = `https://graph.facebook.com/me?` + querystring.stringify({
+      fields: 'id,name,email,picture',
+      access_token: accessToken
+    });
+
+    const profileRes = await fetch(profileUrl);
+    const profileData = await profileRes.json();
+    console.log({ tokenUrl, accessToken, profileRes });
 
     if (profileData.error) {
-      throw new Error('Failed to get Facebook profile');
+      return res.status(400).json({ message: 'Failed to get Facebook profile', details: profileData });
     }
+    console.log({ tokenUrl, accessToken, profileData });
 
     const { id: facebookId, name, email, picture } = profileData;
+
 
     let user = await User.findOne({ $or: [{ email }, { facebookId }] });
 

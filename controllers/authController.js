@@ -73,9 +73,6 @@ const googleCallback = async (socket, code) => {
     
     socket.emit('auth:google:success', { token, user });
     
-    const io = require('../socket').getIO();
-    io.emit('receiveLogin', { token });
-    
     logger.info(`Google login successful for user: ${user.email}`);
   } catch (error) {
     socket.emit('auth:google:error', { message: error.message });
@@ -85,6 +82,7 @@ const googleCallback = async (socket, code) => {
 
 const facebookCallback = async (socket, code) => {
   try {
+    console.log({socket,code});
     const sessionInfo = {
       ipAddress: socket.handshake.address,
       userAgent: socket.handshake.headers['user-agent']
@@ -92,10 +90,6 @@ const facebookCallback = async (socket, code) => {
     const { token, user } = await authService.handleFacebookCallback(code, sessionInfo);
     
     socket.emit('auth:facebook:success', { token, user });
-    
-    const io = require('../socket').getIO();
-    io.emit('receiveLogin', { token });
-    
     logger.info(`Facebook login successful for user: ${user.name}`);
   } catch (error) {
     socket.emit('auth:facebook:error', { 
