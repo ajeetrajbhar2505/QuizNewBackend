@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
 const logger = require('../config/logger');
+const { getIO } = require('../config/socket');
 
 // Google OAuth callback
 router.get('/auth/google/callback', async (req, res) => {
