@@ -7,6 +7,7 @@ const { getIO } = require('../config/socket');
 // Google OAuth callback
 router.get('/auth/google/callback', async (req, res) => {
     try {
+        const { code } = req.query;
         const socket = getIO();
 
         if (!socket) {
@@ -47,6 +48,7 @@ router.get('/auth/google/callback', async (req, res) => {
 // Facebook OAuth callback
 router.get('/auth/facebook/callback', async (req, res) => {
     try {
+        const { code } = req.query;
         const socket = getIO();
 
         if (!socket) {
