@@ -23,6 +23,7 @@ router.get('/auth/google/callback', async (req, res) => {
       }
   
       // Forward the code to the socket handler
+      console.log({'auth:google:callback' : code});
       socket.emit('auth:google:callback', code);
       
       res.send(`
@@ -32,6 +33,7 @@ router.get('/auth/google/callback', async (req, res) => {
       `);
     } catch (error) {
       logger.error(`Google callback route error: ${error.message}`);
+      console.log({'auth:google:callback:error' : error});
       res.status(500).send(`
         <script>
           window.opener.postMessage({
@@ -64,6 +66,7 @@ router.get('/auth/facebook/callback', async (req, res) => {
       
           // Forward the code to the socket handler
           socket.emit('auth:facebook:callback', code);
+      console.log({'auth:facebook:callback' : code});
           
           res.send(`
             <script>
@@ -72,7 +75,8 @@ router.get('/auth/facebook/callback', async (req, res) => {
           `);
         } catch (error) {
           logger.error(`Facebook callback route error: ${error.message}`);
-          res.status(500).send(`
+      console.log({'auth:facebook:callback:error' : error});
+      res.status(500).send(`
             <script>
               window.opener.postMessage({
                 type: 'oauth-error',
