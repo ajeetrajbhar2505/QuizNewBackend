@@ -65,8 +65,8 @@ userSchema.methods.markAsLoggedIn = function (sessionInfo = {}) {
 };
 
 userSchema.methods.markAsLoggedOut = function () {
-  this.activeSessions = Math.max(0, this.activeSessions--);
-  this.isLoggedIn = false;
+  this.activeSessions = Math.max(0, this.activeSessions - 1);
+  this.isLoggedIn = this.activeSessions > 0;
 };
 
 // Static method for finding by email or social IDs
