@@ -93,29 +93,37 @@ const handleGoogleCallback = async (code, sessionInfo) => {
     });
 
     const { email, name, picture, sub: googleId } = ticket.getPayload();
+    const avatar = picture || null
 
-    //  Atomic find-and-modify operation to prevent race conditions
-    const user = await User.findOneAndUpdate(
-      { $or: [{ email }, { googleId }] },
-      {
-        $setOnInsert: { // Only set on creation
-          name,
-          email,
-          googleId,
-          avatar: picture,
-          isVerified: true
-        },
-        $set: {
-          lastLogin: new Date(),
-          avatar: picture
-        }
+
+    // Find or create user atomically
+    const updateOperations = {
+      $set: {
+        lastLogin: new Date()
       },
+      $setOnInsert: {
+        name,
+        email: email || `${googleId}@googleId.com`,
+        googleId,
+        isVerified: true
+      }
+    };
+
+    // Only update avatar if it exists and is different
+    if (avatar) {
+      updateOperations.$set.avatar = avatar;
+    }
+
+    const user = await User.findOneAndUpdate(
+      { $or: [{ email: email || '' }, { googleId }] },
+      updateOperations,
       {
         upsert: true,
         new: true,
         runValidators: true
       }
     );
+
 
     user.markAsLoggedIn(sessionInfo);
     await user.save();
@@ -165,23 +173,30 @@ const handleFacebookCallback = async (code, sessionInfo) => {
 
     const { id: facebookId, name, email, picture } = profileData;
 
+    const avatar = picture || null
+
+
     // Find or create user atomically
-    //  Atomic find-and-modify operation to prevent race conditions
-    const user = await User.findOneAndUpdate(
-      { $or: [{ email }, { facebookId }] },
-      {
-        $setOnInsert: { // Only set on creation
-          name,
-          email: email || `${facebookId}@facebook.com`,
-          facebookId,
-          avatar: picture,
-          isVerified: true
-        },
-        $set: {
-          lastLogin: new Date(),
-          avatar: picture
-        }
+    const updateOperations = {
+      $set: {
+        lastLogin: new Date()
       },
+      $setOnInsert: {
+        name,
+        email: email || `${facebookId}@facebook.com`,
+        facebookId,
+        isVerified: true
+      }
+    };
+
+    // Only update avatar if it exists and is different
+    if (avatar) {
+      updateOperations.$set.avatar = avatar;
+    }
+
+    const user = await User.findOneAndUpdate(
+      { $or: [{ email: email || '' }, { facebookId }] },
+      updateOperations,
       {
         upsert: true,
         new: true,
