@@ -5,8 +5,8 @@ const userSchema = new mongoose.Schema({
   name: { type: String },
   email: { type: String, required: true, unique: true, sparse: true },
   password: { type: String },
-  googleId: { type: String, unique: true, sparse: true },
-  facebookId: { type: String, unique: true, sparse: true },
+  googleId: { type: String},
+  facebookId: { type: String},
   avatar: { type: String },
   isVerified: { type: Boolean, default: false },
   isLoggedIn: { type: Boolean, default: false },           // Current login status
