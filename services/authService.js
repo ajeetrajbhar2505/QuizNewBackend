@@ -94,25 +94,28 @@ const handleGoogleCallback = async (code, sessionInfo) => {
 
     const { email, name, picture, sub: googleId } = ticket.getPayload();
 
-    // Find or create user atomically
-    let user = await User.findOne({ $or: [{ email }, { googleId }] });
-
-    if (user) {
-      if (!user.googleId) {
-        user.googleId = googleId;
-        user.avatar = picture;
-        await user.save();
+    //  Atomic find-and-modify operation to prevent race conditions
+    const user = await User.findOneAndUpdate(
+      { $or: [{ email }, { googleId }] },
+      {
+        $setOnInsert: { // Only set on creation
+          name,
+          email,
+          googleId,
+          avatar: picture,
+          isVerified: true
+        },
+        $set: {
+          lastLogin: new Date(),
+          avatar: picture
+        }
+      },
+      {
+        upsert: true,
+        new: true,
+        runValidators: true
       }
-    } else {
-      user = new User({
-        name,
-        email,
-        googleId,
-        avatar: picture,
-        isVerified: true
-      });
-      await user.save();
-    }
+    );
 
     user.markAsLoggedIn(sessionInfo);
     await user.save();
@@ -131,7 +134,7 @@ const handleGoogleCallback = async (code, sessionInfo) => {
 const handleFacebookCallback = async (code, sessionInfo) => {
   try {
     // Get access token
-    const tokenUrl = `https://graph.facebook.com/v19.0/oauth/access_token?` + 
+    const tokenUrl = `https://graph.facebook.com/v19.0/oauth/access_token?` +
       querystring.stringify({
         client_id: process.env.FACEBOOK_APP_ID,
         client_secret: process.env.FACEBOOK_APP_SECRET,
@@ -147,7 +150,7 @@ const handleFacebookCallback = async (code, sessionInfo) => {
     }
 
     // Get user profile
-    const profileUrl = `https://graph.facebook.com/me?` + 
+    const profileUrl = `https://graph.facebook.com/me?` +
       querystring.stringify({
         fields: 'id,name,email,picture',
         access_token: tokenData.access_token
@@ -163,24 +166,28 @@ const handleFacebookCallback = async (code, sessionInfo) => {
     const { id: facebookId, name, email, picture } = profileData;
 
     // Find or create user atomically
-    let user = await User.findOne({ $or: [{ email }, { facebookId }] });
-
-    if (user) {
-      if (!user.facebookId) {
-        user.facebookId = facebookId;
-        user.avatar = picture?.data?.url;
-        await user.save();
+    //  Atomic find-and-modify operation to prevent race conditions
+    const user = await User.findOneAndUpdate(
+      { $or: [{ email }, { facebookId }] },
+      {
+        $setOnInsert: { // Only set on creation
+          name,
+          email: email || `${facebookId}@facebook.com`,
+          facebookId,
+          avatar: picture,
+          isVerified: true
+        },
+        $set: {
+          lastLogin: new Date(),
+          avatar: picture
+        }
+      },
+      {
+        upsert: true,
+        new: true,
+        runValidators: true
       }
-    } else {
-      user = new User({
-        name,
-        email: email || `${facebookId}@facebook.com`,
-        facebookId,
-        avatar: picture?.data?.url,
-        isVerified: true
-      });
-      await user.save();
-    }
+    );
 
     user.markAsLoggedIn(sessionInfo);
     await user.save();
