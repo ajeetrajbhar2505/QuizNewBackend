@@ -3,10 +3,10 @@ const bcrypt = require('bcryptjs');
 
 const userSchema = new mongoose.Schema({
   name: { type: String },
-  email: { type: String, required: true, unique: true },
+  email: { type: String, required: true, unique: true, sparse: true },
   password: { type: String },
-  googleId: { type: String },
-  facebookId: { type: String },
+  googleId: { type: String, unique: true, sparse: true },
+  facebookId: { type: String, unique: true, sparse: true },
   avatar: { type: String },
   isVerified: { type: Boolean, default: false },
   isLoggedIn: { type: Boolean, default: false },           // Current login status
@@ -24,7 +24,7 @@ const userSchema = new mongoose.Schema({
   updatedAt: { type: Date, default: Date.now }
 }, {
   toJSON: {
-    transform: function(doc, ret) {
+    transform: function (doc, ret) {
       delete ret.password;                 // Always remove password in responses
       delete ret.googleId;                 // Remove sensitive IDs
       delete ret.facebookId;
@@ -33,9 +33,9 @@ const userSchema = new mongoose.Schema({
 });
 
 // Password hashing middleware
-userSchema.pre('save', async function(next) {
+userSchema.pre('save', async function (next) {
   if (!this.isModified('password') || !this.password) return next();
-  
+
   try {
     this.password = await bcrypt.hash(this.password, 12);
     this.updatedAt = Date.now();
@@ -46,12 +46,12 @@ userSchema.pre('save', async function(next) {
 });
 
 // Password comparison method
-userSchema.methods.comparePassword = async function(candidatePassword) {
+userSchema.methods.comparePassword = async function (candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
 };
 
 // Login status management methods
-userSchema.methods.markAsLoggedIn = function(sessionInfo = {}) {
+userSchema.methods.markAsLoggedIn = function (sessionInfo = {}) {
   this.isLoggedIn = true;
   this.lastLoginAt = new Date();
   this.activeSessions += 1;
@@ -64,13 +64,13 @@ userSchema.methods.markAsLoggedIn = function(sessionInfo = {}) {
   if (this.loginHistory.length > 10) this.loginHistory.shift();
 };
 
-userSchema.methods.markAsLoggedOut = function() {
+userSchema.methods.markAsLoggedOut = function () {
   this.activeSessions = Math.max(0, this.activeSessions - 1);
   this.isLoggedIn = this.activeSessions > 0;
 };
 
 // Static method for finding by email or social IDs
-userSchema.statics.findByCredentials = async function({ email, googleId, facebookId }) {
+userSchema.statics.findByCredentials = async function ({ email, googleId, facebookId }) {
   return this.findOne({
     $or: [
       { email },

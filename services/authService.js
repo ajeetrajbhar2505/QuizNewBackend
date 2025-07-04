@@ -94,24 +94,28 @@ const handleGoogleCallback = async (code, sessionInfo) => {
 
     const { email, name, picture, sub: googleId } = ticket.getPayload();
 
-    let user = await User.findOne({ $or: [{ email }, { googleId }] });
-
-    if (user) {
-      if (!user.googleId) {
-        user.googleId = googleId;
-        user.avatar = picture;
-        await user.save();
+    // Find or create user atomically
+    const user = await User.findOneAndUpdate(
+      { $or: [{ email }, { googleId }] },
+      {
+        $setOnInsert: {
+          name,
+          email,
+          googleId,
+          avatar: picture,
+          isVerified: true
+        },
+        $set: {
+          lastLogin: new Date(),
+          avatar: picture // Update avatar on each login
+        }
+      },
+      {
+        upsert: true,
+        new: true,
+        runValidators: true
       }
-    } else {
-      user = new User({
-        name,
-        email,
-        googleId,
-        avatar: picture,
-        isVerified: true
-      });
-      await user.save();
-    }
+    );
 
     user.markAsLoggedIn(sessionInfo);
     await user.save();
@@ -127,63 +131,63 @@ const handleGoogleCallback = async (code, sessionInfo) => {
     throw new Error('Google authentication failed');
   }
 };
-
 const handleFacebookCallback = async (code, sessionInfo) => {
   try {
-
-    const tokenUrl = `https://graph.facebook.com/v19.0/oauth/access_token?` + querystring.stringify({
-      client_id: process.env.FACEBOOK_APP_ID,
-      client_secret: process.env.FACEBOOK_APP_SECRET,
-      redirect_uri: process.env.REDIRECT_URI,
-      code: code
-    });
-
+    // Get access token
+    const tokenUrl = `https://graph.facebook.com/v19.0/oauth/access_token?` + 
+      querystring.stringify({
+        client_id: process.env.FACEBOOK_APP_ID,
+        client_secret: process.env.FACEBOOK_APP_SECRET,
+        redirect_uri: process.env.REDIRECT_URI,
+        code: code
+      });
 
     const tokenRes = await fetch(tokenUrl);
     const tokenData = await tokenRes.json();
 
     if (!tokenData.access_token) {
-      return res.status(400).json({ message: 'Failed to get access token', details: tokenData });
+      throw new Error('Failed to get Facebook access token');
     }
 
-    const accessToken = tokenData.access_token;
-
-    // Step 2: Fetch user profile
-    const profileUrl = `https://graph.facebook.com/me?` + querystring.stringify({
-      fields: 'id,name,email,picture',
-      access_token: accessToken
-    });
+    // Get user profile
+    const profileUrl = `https://graph.facebook.com/me?` + 
+      querystring.stringify({
+        fields: 'id,name,email,picture',
+        access_token: tokenData.access_token
+      });
 
     const profileRes = await fetch(profileUrl);
     const profileData = await profileRes.json();
-    console.log({ tokenUrl, accessToken, profileRes });
 
     if (profileData.error) {
-      return res.status(400).json({ message: 'Failed to get Facebook profile', details: profileData });
+      throw new Error('Failed to get Facebook profile');
     }
-    console.log({ tokenUrl, accessToken, profileData });
 
     const { id: facebookId, name, email, picture } = profileData;
+    const avatar = picture?.data?.url;
 
-
-    let user = await User.findOne({ $or: [{ email }, { facebookId }] });
-
-    if (user) {
-      if (!user.facebookId) {
-        user.facebookId = facebookId;
-        user.avatar = picture?.data?.url;
-        await user.save();
+    // Find or create user atomically
+    const user = await User.findOneAndUpdate(
+      { $or: [{ email }, { facebookId }] },
+      {
+        $setOnInsert: {
+          name,
+          email: email || `${facebookId}@facebook.com`,
+          facebookId,
+          avatar,
+          isVerified: true
+        },
+        $set: {
+          lastLogin: new Date(),
+          avatar // Update avatar on each login
+        }
+      },
+      {
+        upsert: true,
+        new: true,
+        runValidators: true
       }
-    } else {
-      user = new User({
-        name,
-        email: email || `${facebookId}@facebook.com`,
-        facebookId,
-        avatar: picture?.data?.url,
-        isVerified: true
-      });
-      await user.save();
-    }
+    );
 
     user.markAsLoggedIn(sessionInfo);
     await user.save();
