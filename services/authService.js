@@ -95,26 +95,24 @@ const handleGoogleCallback = async (code, sessionInfo) => {
     const { email, name, picture, sub: googleId } = ticket.getPayload();
 
     // Find or create user atomically
-    const user = await User.findOneAndUpdate(
-      { $or: [{ email }, { googleId }] },
-      {
-        $setOnInsert: {
-          name,
-          email,
-          googleId,
-          avatar: picture,
-          isVerified: true
-        },
-        $set: {
-          lastLogin: new Date(),
-        }
-      },
-      {
-        upsert: true,
-        new: true,
-        runValidators: true
+    let user = await User.findOne({ $or: [{ email }, { googleId }] });
+
+    if (user) {
+      if (!user.googleId) {
+        user.googleId = googleId;
+        user.avatar = picture;
+        await user.save();
       }
-    );
+    } else {
+      user = new User({
+        name,
+        email,
+        googleId,
+        avatar: picture,
+        isVerified: true
+      });
+      await user.save();
+    }
 
     user.markAsLoggedIn(sessionInfo);
     await user.save();
@@ -163,29 +161,26 @@ const handleFacebookCallback = async (code, sessionInfo) => {
     }
 
     const { id: facebookId, name, email, picture } = profileData;
-    const avatar = picture?.data?.url;
 
     // Find or create user atomically
-    const user = await User.findOneAndUpdate(
-      { $or: [{ email }, { facebookId }] },
-      {
-        $setOnInsert: {
-          name,
-          email: email || `${facebookId}@facebook.com`,
-          facebookId,
-          avatar,
-          isVerified: true
-        },
-        $set: {
-          lastLogin: new Date(),
-        }
-      },
-      {
-        upsert: true,
-        new: true,
-        runValidators: true
+    let user = await User.findOne({ $or: [{ email }, { facebookId }] });
+
+    if (user) {
+      if (!user.facebookId) {
+        user.facebookId = facebookId;
+        user.avatar = picture?.data?.url;
+        await user.save();
       }
-    );
+    } else {
+      user = new User({
+        name,
+        email: email || `${facebookId}@facebook.com`,
+        facebookId,
+        avatar: picture?.data?.url,
+        isVerified: true
+      });
+      await user.save();
+    }
 
     user.markAsLoggedIn(sessionInfo);
     await user.save();
