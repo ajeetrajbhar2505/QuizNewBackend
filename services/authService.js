@@ -107,6 +107,7 @@ const handleGoogleCallback = async (code, sessionInfo) => {
         },
         $set: {
           lastLogin: new Date(),
+          avatar
         }
       },
       {
@@ -178,6 +179,7 @@ const handleFacebookCallback = async (code, sessionInfo) => {
         },
         $set: {
           lastLogin: new Date(),
+          avatar
         }
       },
       {
