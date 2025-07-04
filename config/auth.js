@@ -18,13 +18,21 @@ const generateToken = (user) => {
   );
 };
 
+
 const verifyToken = (token) => {
-  try {
-    return jwt.verify(token, JWT_SECRET);
-  } catch (err) {
-    logger.error('JWT Verification Error:', err);
-    return null;
-  }
+  return new Promise((resolve, reject) => {
+    if (!token) {
+      return reject(new Error('No token provided'));
+    }
+
+    jwt.verify(token, process.env.JWT_SECRET, (err, decoded) => {
+      if (err) {
+        console.error('JWT verification error:', err.name);
+        return reject(new Error('Invalid token'));
+      }
+      resolve(decoded);
+    });
+  });
 };
 
 const verifyGoogleToken = async (token) => {
