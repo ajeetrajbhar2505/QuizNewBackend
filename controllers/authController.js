@@ -27,12 +27,11 @@ const login = async (socket, data) => {
   }
 };
 
-const logout = async (socket) => {
+const logout = async (socket,userId) => {
   try {
-    const userId = socket.user?._id;
     if (userId) {
       await authService.logoutUser(userId);
-      socket.emit('auth:logout:success');
+      socket.emit('auth:logout:success'); 
       logger.info(`User logged out: ${userId}`);
     }
   } catch (error) {
