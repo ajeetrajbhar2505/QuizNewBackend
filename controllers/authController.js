@@ -81,7 +81,6 @@ const googleCallback = async (socket, code) => {
 
 const facebookCallback = async (socket, code) => {
   try {
-    console.log({socket,code});
     const sessionInfo = {
       ipAddress: socket.handshake.address,
       userAgent: socket.handshake.headers['user-agent']
