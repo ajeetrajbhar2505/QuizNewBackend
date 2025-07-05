@@ -135,7 +135,7 @@ const handleFacebookCallback = async (code, sessionInfo) => {
       querystring.stringify({
         client_id: process.env.FACEBOOK_APP_ID,
         client_secret: process.env.FACEBOOK_APP_SECRET,
-        redirect_uri: process.env.FACEBOOK_REDIRECT_URI,
+        redirect_uri: process.env.REDIRECT_URI,
         code: code
       });
 
