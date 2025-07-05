@@ -69,10 +69,10 @@ const logoutUser = async (userId) => {
 
 const generateGoogleAuthUrl = async () => {
   try {
-    return await googleClient.generateAuthUrl({
+    return  await googleClient.generateAuthUrl({
       access_type: 'offline',  // Use 'offline' to get refresh token (optional)
       scope: ['https://www.googleapis.com/auth/userinfo.profile', 'https://www.googleapis.com/auth/userinfo.email'], // Requested scopes
-    });
+  });
   } catch (error) {
     return error
   }
@@ -81,8 +81,7 @@ const generateGoogleAuthUrl = async () => {
 
 const generateFacebookAuthUrl = () => {
   return `https://www.facebook.com/v19.0/dialog/oauth?client_id=${process.env.FACEBOOK_APP_ID}&redirect_uri=${encodeURIComponent(process.env.REDIRECT_URI)}&scope=email,public_profile&response_type=code&auth_type=rerequest`;
-  ``
-};
+``};
 
 const handleGoogleCallback = async (code, sessionInfo) => {
   try {
@@ -93,37 +92,27 @@ const handleGoogleCallback = async (code, sessionInfo) => {
     });
 
     const { email, name, picture, sub: googleId } = ticket.getPayload();
-    const avatar = picture || null
 
+    let user = await User.findOne({ $or: [{ email }, { googleId }] });
+    const defaultAvatar = 'https://quiznewbackend.onrender.com/profile.jpg';
+    const avatar = picture || defaultAvatar
 
-    // Find or create user atomically
-    const updateOperations = {
-      $set: {
-        lastLogin: new Date()
-      },
-      $setOnInsert: {
+    if (user) {
+      if (!user.googleId) {
+        user.googleId = googleId;
+        user.avatar = avatar;
+        await user.save();
+      }
+    } else {
+      user = new User({
         name,
-        email: email || `${googleId}@googleId.com`,
+        email,
         googleId,
+        avatar: avatar,
         isVerified: true
-      }
-    };
-
-    // Only update avatar if it exists and is different
-    if (avatar) {
-      updateOperations.$set.avatar = avatar;
+      });
+      await user.save();
     }
-
-    const user = await User.findOneAndUpdate(
-      { $or: [{ email: email || '' }, { googleId }] },
-      updateOperations,
-      {
-        upsert: true,
-        new: true,
-        runValidators: true
-      }
-    );
-
 
     user.markAsLoggedIn(sessionInfo);
     await user.save();
@@ -142,8 +131,7 @@ const handleGoogleCallback = async (code, sessionInfo) => {
 
 const handleFacebookCallback = async (code, sessionInfo) => {
   try {
-    // Get access token
-    const tokenUrl = `https://graph.facebook.com/v19.0/oauth/access_token?` +
+    const tokenUrl = `https://graph.facebook.com/v19.0/oauth/access_token?` + 
       querystring.stringify({
         client_id: process.env.FACEBOOK_APP_ID,
         client_secret: process.env.FACEBOOK_APP_SECRET,
@@ -151,57 +139,48 @@ const handleFacebookCallback = async (code, sessionInfo) => {
         code: code
       });
 
-    const tokenRes = await fetch(tokenUrl);
-    const tokenData = await tokenRes.json();
+    const tokenRes = await axios.get(tokenUrl);
+    const tokenData = tokenRes.data;
 
     if (!tokenData.access_token) {
-      throw new Error('Failed to get Facebook access token: ' + JSON.stringify(tokenData));
+      throw new Error('Failed to get Facebook access token');
     }
 
-    // Get user profile with larger picture
-    const profileUrl = `https://graph.facebook.com/me?` +
+    const profileUrl = `https://graph.facebook.com/me?` + 
       querystring.stringify({
-        fields: 'id,name,email,picture.width(500).height(500)',
+        fields: 'id,name,email,picture',
         access_token: tokenData.access_token
       });
 
-    const profileRes = await fetch(profileUrl);
-    const profileData = await profileRes.json();
+    const profileRes = await axios.get(profileUrl);
+    const profileData = profileRes.data;
 
     if (profileData.error) {
-      throw new Error('Facebook profile error: ' + JSON.stringify(profileData));
+      throw new Error('Failed to get Facebook profile');
     }
 
     const { id: facebookId, name, email, picture } = profileData;
-    
-    // Extract avatar URL properly
-    const avatarUrl = picture?.data?.url || null;
-    const defaultAvatar = 'https://quiznewbackend.onrender.com/profile.jpg';
 
-    // Find or create user atomically
-    const updateOperations = {
-      $set: {
-        lastLogin: new Date(),
-        ...(avatarUrl && { avatar: avatarUrl }) // Only set if avatar exists
-      },
-      $setOnInsert: {
+    let user = await User.findOne({ $or: [{ email }, { facebookId }] });
+    const defaultAvatar = 'https://quiznewbackend.onrender.com/profile.jpg';
+    const avatar = picture?.data?.url || defaultAvatar
+
+    if (user) {
+      if (!user.facebookId) {
+        user.facebookId = facebookId;
+        user.avatar = avatar;
+        await user.save();
+      }
+    } else {
+      user = new User({
         name,
         email: email || `${facebookId}@facebook.com`,
         facebookId,
-        avatar: avatarUrl || defaultAvatar, // Set default if no avatar
+        avatar: avatar,
         isVerified: true
-      }
-    };
-
-    const user = await User.findOneAndUpdate(
-      { $or: [{ email: email || '' }, { facebookId }] },
-      updateOperations,
-      {
-        upsert: true,
-        new: true,
-        runValidators: true
-      }
-    );
+      });
+      await user.save();
+    }
 
     user.markAsLoggedIn(sessionInfo);
     await user.save();
@@ -209,20 +188,11 @@ const handleFacebookCallback = async (code, sessionInfo) => {
     const token = generateToken(user);
     const userResponse = user.toObject();
 
-    logger.info(`Facebook login successful for user: ${user._id}`);
+    logger.info(`Facebook login successful for user: ${name}`);
     return { token, user: userResponse };
 
   } catch (error) {
-    logger.error('Facebook callback error:', {
-      message: error.message,
-      stack: error.stack,
-      error: error
-    });
-    
-    // More specific error messages
-    if (error.name === 'CastError' && error.path === 'avatar') {
-      throw new Error('Invalid avatar format received from Facebook');
-    }
+    logger.error(`Facebook callback error: ${error.message}`);
     throw new Error(`Facebook authentication failed: ${error.message}`);
   }
 };
