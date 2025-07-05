@@ -172,8 +172,9 @@ const handleFacebookCallback = async (code, sessionInfo) => {
     }
 
     const { id: facebookId, name, email, picture } = profileData;
+    console.log({profileData});
 
-    const avatar = picture || null
+    const avatar = picture || 'https://quiznewbackend.onrender.com/profile.jpg'
 
 
     // Find or create user atomically
