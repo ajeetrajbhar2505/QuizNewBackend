@@ -139,6 +139,7 @@ const handleGoogleCallback = async (code, sessionInfo) => {
     throw new Error('Google authentication failed');
   }
 };
+
 const handleFacebookCallback = async (code, sessionInfo) => {
   try {
     // Get access token
@@ -146,7 +147,7 @@ const handleFacebookCallback = async (code, sessionInfo) => {
       querystring.stringify({
         client_id: process.env.FACEBOOK_APP_ID,
         client_secret: process.env.FACEBOOK_APP_SECRET,
-        redirect_uri: process.env.REDIRECT_URI,
+        redirect_uri: process.env.FACEBOOK_REDIRECT_URI,
         code: code
       });
 
@@ -154,13 +155,13 @@ const handleFacebookCallback = async (code, sessionInfo) => {
     const tokenData = await tokenRes.json();
 
     if (!tokenData.access_token) {
-      throw new Error('Failed to get Facebook access token');
+      throw new Error('Failed to get Facebook access token: ' + JSON.stringify(tokenData));
     }
 
-    // Get user profile
+    // Get user profile with larger picture
     const profileUrl = `https://graph.facebook.com/me?` +
       querystring.stringify({
-        fields: 'id,name,email,picture',
+        fields: 'id,name,email,picture.width(500).height(500)',
         access_token: tokenData.access_token
       });
 
@@ -168,32 +169,29 @@ const handleFacebookCallback = async (code, sessionInfo) => {
     const profileData = await profileRes.json();
 
     if (profileData.error) {
-      throw new Error('Failed to get Facebook profile');
+      throw new Error('Facebook profile error: ' + JSON.stringify(profileData));
     }
 
     const { id: facebookId, name, email, picture } = profileData;
-    console.log({profileData});
-
-    const avatar = picture || 'https://quiznewbackend.onrender.com/profile.jpg'
-
+    
+    // Extract avatar URL properly
+    const avatarUrl = picture?.data?.url || null;
+    const defaultAvatar = 'https://quiznewbackend.onrender.com/profile.jpg';
 
     // Find or create user atomically
     const updateOperations = {
       $set: {
-        lastLogin: new Date()
+        lastLogin: new Date(),
+        ...(avatarUrl && { avatar: avatarUrl }) // Only set if avatar exists
       },
       $setOnInsert: {
         name,
         email: email || `${facebookId}@facebook.com`,
         facebookId,
+        avatar: avatarUrl || defaultAvatar, // Set default if no avatar
         isVerified: true
       }
     };
-
-    // Only update avatar if it exists and is different
-    if (avatar) {
-      updateOperations.$set.avatar = avatar;
-    }
 
     const user = await User.findOneAndUpdate(
       { $or: [{ email: email || '' }, { facebookId }] },
@@ -211,11 +209,20 @@ const handleFacebookCallback = async (code, sessionInfo) => {
     const token = generateToken(user);
     const userResponse = user.toObject();
 
-    logger.info(`Facebook login successful for user: ${name}`);
+    logger.info(`Facebook login successful for user: ${user._id}`);
     return { token, user: userResponse };
 
   } catch (error) {
-    logger.error(`Facebook callback error: ${error.message}`);
+    logger.error('Facebook callback error:', {
+      message: error.message,
+      stack: error.stack,
+      error: error
+    });
+    
+    // More specific error messages
+    if (error.name === 'CastError' && error.path === 'avatar') {
+      throw new Error('Invalid avatar format received from Facebook');
+    }
     throw new Error(`Facebook authentication failed: ${error.message}`);
   }
 };
