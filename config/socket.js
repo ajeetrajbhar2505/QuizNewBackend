@@ -25,8 +25,6 @@ const initSocket = (server) => {
     socket.on('auth:google:callback', (code) => authController.googleCallback(socket, code));
     socket.on('auth:facebook:login', () => authController.facebookLogin(socket));
     socket.on('auth:facebook:callback', (code) => authController.facebookCallback(socket, code));
-    socket.on('auth:otp:send', (email) => authController.sendOTP(socket, email));
-    socket.on('auth:otp:verify', (data) => authController.verifyOTP(socket, data));
     
     // Apply authentication middleware for other events
     socket.use((event, next) => {
@@ -38,8 +36,6 @@ const initSocket = (server) => {
         'auth:google:callback',
         'auth:facebook:login',
         'auth:facebook:callback',
-        'auth:otp:send',
-        'auth:otp:verify',
         'disconnect'
       ];
       

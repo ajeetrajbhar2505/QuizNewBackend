@@ -18,7 +18,7 @@ const login = async (socket, data) => {
       ipAddress: socket.handshake.address,
       userAgent: socket.handshake.headers['user-agent']
     };
-    const result = await authService.loginUser(data.email, data.password, sessionInfo);
+    const result = await authService.loginUser(data.email, sessionInfo);
     socket.emit('auth:login:success', result);
     logger.info(`User logged in: ${data.email}`);
   } catch (error) {

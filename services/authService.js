@@ -43,20 +43,30 @@ const registerUser = async (userData) => {
   return { user: newUser.toObject() };
 };
 
-const loginUser = async (email, password, sessionInfo) => {
-  const user = await User.findOne({ email });
-  if (!user) throw new Error('User not found');
+const loginUser = async (email, sessionInfo) => {
+  const session = await User.startSession();
+  session.startTransaction();
 
-  const isMatch = await user.comparePassword(password);
-  if (!isMatch) throw new Error('Invalid credentials');
+  try {
+    const user = await User.findOne({ email }).session(session);
+    if (!user) throw new Error('User not found');
 
-  user.markAsLoggedIn(sessionInfo);
-  await user.save();
+    user.markAsLoggedIn(sessionInfo);
+    await user.save({ session });
 
-  const token = generateToken(user);
-  const userResponse = user.toObject();
+    const token = generateToken(user);
+    const userResponse = user.toObject();
 
-  return { token, user: userResponse };
+    await session.commitTransaction();
+    session.endSession();
+
+    return { token, user: userResponse };
+
+  } catch (error) {
+    await session.abortTransaction();
+    session.endSession();
+    throw error;
+  }
 };
 
 const logoutUser = async (userId) => {
@@ -92,36 +102,68 @@ const handleGoogleCallback = async (code, sessionInfo) => {
     });
 
     const { email, name, picture, sub: googleId } = ticket.getPayload();
-
-    let user = await User.findOne({ $or: [{ email }, { googleId }] });
     const defaultAvatar = 'https://quiznewbackend.onrender.com/profile.jpg';
-    const avatar = picture?.data?.url || defaultAvatar
-    
-    if (user) {
-      if (!user.googleId) {
-        user.googleId = googleId;
-        user.avatar = avatar;
-        await user.save();
+    const avatar = picture?.startsWith('http') ? picture : defaultAvatar;
+
+    // Start a session to handle concurrent operations
+    const session = await User.startSession();
+    session.startTransaction();
+
+    try {
+      let user = await User.findOne({ $or: [{ email }, { googleId }] }).session(session);
+
+      if (user) {
+        // Use findOneAndUpdate to avoid version conflicts
+        if (!user.googleId) {
+          user = await User.findOneAndUpdate(
+            { _id: user._id },
+            { 
+              $set: { googleId, avatar },
+              $addToSet: { loginHistory: sessionInfo },
+              $setOnInsert: { lastLoginAt: new Date() }
+            },
+            { new: true, session }
+          );
+        } else {
+          // Just update login history for existing users
+          user = await User.findOneAndUpdate(
+            { _id: user._id },
+            { 
+              $addToSet: { loginHistory: sessionInfo },
+              $set: { lastLoginAt: new Date() }
+            },
+            { new: true, session }
+          );
+        }
+      } else {
+        // Create new user
+        user = new User({
+          name,
+          email,
+          googleId,
+          avatar,
+          isVerified: true,
+          loginHistory: [sessionInfo],
+          lastLoginAt: new Date()
+        });
+        await user.save({ session });
       }
-    } else {
-      user = new User({
-        name,
-        email,
-        googleId,
-        avatar: avatar,
-        isVerified: true
-      });
-      await user.save();
+
+      await session.commitTransaction();
+      session.endSession();
+
+      const token = generateToken(user);
+      const userResponse = user.toObject();
+
+      logger.info(`Google login successful for user: ${email}`);
+      return { token, user: userResponse };
+
+    } catch (error) {
+      await session.abortTransaction();
+      session.endSession();
+      logger.error(`Transaction error during Google auth: ${error.message}`);
+      throw new Error('Google authentication failed');
     }
-
-    user.markAsLoggedIn(sessionInfo);
-    await user.save();
-
-    const token = generateToken(user);
-    const userResponse = user.toObject();
-
-    logger.info(`Google login successful for user: ${email}`);
-    return { token, user: userResponse };
 
   } catch (error) {
     logger.error(`Google callback error: ${error.message}`);
@@ -130,7 +172,11 @@ const handleGoogleCallback = async (code, sessionInfo) => {
 };
 
 const handleFacebookCallback = async (code, sessionInfo) => {
+  const session = await User.startSession();
+  session.startTransaction();
+
   try {
+    // Step 1: Exchange code for access token
     const tokenUrl = `https://graph.facebook.com/v19.0/oauth/access_token?` + 
       querystring.stringify({
         client_id: process.env.FACEBOOK_APP_ID,
@@ -146,9 +192,10 @@ const handleFacebookCallback = async (code, sessionInfo) => {
       throw new Error('Failed to get Facebook access token');
     }
 
+    // Step 2: Get user profile
     const profileUrl = `https://graph.facebook.com/me?` + 
       querystring.stringify({
-        fields: 'id,name,email,picture',
+        fields: 'id,name,email,picture.width(500).height(500)',
         access_token: tokenData.access_token
       });
 
@@ -156,43 +203,74 @@ const handleFacebookCallback = async (code, sessionInfo) => {
     const profileData = profileRes.data;
 
     if (profileData.error) {
-      throw new Error('Failed to get Facebook profile');
+      throw new Error(`Facebook API error: ${profileData.error.message}`);
     }
 
     const { id: facebookId, name, email, picture } = profileData;
-
-    let user = await User.findOne({ $or: [{ email }, { facebookId }] });
     const defaultAvatar = 'https://quiznewbackend.onrender.com/profile.jpg';
-    const avatar = picture?.data?.url || defaultAvatar
+    const avatar = picture?.data?.url || defaultAvatar;
+    const userEmail = email || `${facebookId}@facebook.com`;
+
+    // Step 3: Find or create user in transaction
+    let user = await User.findOne({ $or: [{ email: userEmail }, { facebookId }] })
+      .session(session);
 
     if (user) {
-      if (!user.facebookId) {
-        user.facebookId = facebookId;
-        user.avatar = avatar;
-        await user.save();
-      }
+      // Update existing user
+      const update = {
+        $set: {
+          lastLoginAt: new Date(),
+          ...(!user.facebookId && { facebookId }),
+          ...(!user.avatar?.includes('http') && { avatar })
+        },
+        $addToSet: { 
+          activeSessions: sessionInfo,
+          loginHistory: sessionInfo 
+        }
+      };
+
+      user = await User.findOneAndUpdate(
+        { _id: user._id },
+        update,
+        { new: true, session }
+      );
     } else {
+      // Create new user
       user = new User({
         name,
-        email: email || `${facebookId}@facebook.com`,
+        email: userEmail,
         facebookId,
-        avatar: avatar,
-        isVerified: true
+        avatar,
+        isVerified: true,
+        activeSessions: [sessionInfo],
+        loginHistory: [sessionInfo],
+        lastLoginAt: new Date()
       });
-      await user.save();
+      await user.save({ session });
     }
 
-    user.markAsLoggedIn(sessionInfo);
-    await user.save();
+    // Step 4: Commit transaction
+    await session.commitTransaction();
+    session.endSession();
 
+    // Step 5: Generate token
     const token = generateToken(user);
     const userResponse = user.toObject();
 
-    logger.info(`Facebook login successful for user: ${name}`);
+    logger.info(`Facebook login successful for user: ${user._id}`);
     return { token, user: userResponse };
 
   } catch (error) {
-    logger.error(`Facebook callback error: ${error.message}`);
+    // Handle errors and cleanup
+    await session.abortTransaction();
+    session.endSession();
+
+    logger.error(`Facebook authentication failed: ${error.message}`, {
+      error: error.stack,
+      code,
+      sessionInfo
+    });
+
     throw new Error(`Facebook authentication failed: ${error.message}`);
   }
 };
@@ -201,12 +279,26 @@ const sendOtp = async (email) => {
   const user = await User.findOne({ email });
   if (!user) throw new Error('User not found');
 
-  const otp = otpGenerator.generate(6, { upperCaseAlphabets: false, specialChars: false });
-  const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
-
+  const otp = otpGenerator.generate(6, { 
+    upperCaseAlphabets: false, 
+    specialChars: false 
+  });
+  
+  // Generate a secure random token for OTP verification
+  const token = crypto.randomBytes(32).toString('hex');
+  
+  // Delete any existing OTPs for this email
   await Otp.deleteMany({ email });
-  await new Otp({ email, otp, expiresAt }).save();
+  
+  // Create new OTP document
+  const otpDoc = await new Otp({ 
+    email, 
+    otp, 
+    token,
+    expiresAt: new Date(Date.now() + 5 * 60 * 1000)
+  }).save();
 
+  // Send email
   await transporter.sendMail({
     from: process.env.EMAIL_USER,
     to: email,
@@ -224,29 +316,51 @@ const sendOtp = async (email) => {
     `
   });
 
-  return { message: 'OTP sent to email' };
+  return { 
+    message: 'OTP sent to email',
+    otpId: otpDoc._id,
+    token: otpDoc.token,
+    expiresAt: otpDoc.expiresAt
+  };
 };
 
-const verifyOtp = async (email, otp, sessionInfo) => {
-  const otpRecord = await Otp.findOne({ email, otp });
-  if (!otpRecord) throw new Error('Invalid OTP');
-  if (otpRecord.expiresAt < Date.now()) {
-    await Otp.deleteMany({ email });
-    throw new Error('OTP has expired');
-  }
+const verifyOtp = async (email, otp, otpToken) => {
+  // Find and validate OTP
+  const otpDoc = await Otp.findOne({ 
+    email, 
+    token: otpToken,
+    expiresAt: { $gt: new Date() }
+  });
+  
+  if (!otpDoc) throw new Error('Invalid or expired OTP');
+  if (otpDoc.otp !== otp) throw new Error('Invalid OTP code');
 
-  await Otp.deleteMany({ email });
+  // Delete the OTP after successful verification
+  await Otp.deleteOne({ _id: otpDoc._id });
+
+  // Generate session info
+  const sessionInfo = {
+    ip: req.ip,
+    userAgent: req.headers['user-agent'],
+    loginTime: new Date()
+  };
+
+  // Find user and mark as logged in
   const user = await User.findOne({ email });
   if (!user) throw new Error('User not found');
 
-  user.isVerified = true;
   user.markAsLoggedIn(sessionInfo);
   await user.save();
 
+  // Generate JWT token
   const token = generateToken(user);
   const userResponse = user.toObject();
 
-  return { token, user: userResponse };
+  return { 
+    token, 
+    user: userResponse,
+    message: 'OTP verified successfully'
+  };
 };
 
 module.exports = {
