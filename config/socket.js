@@ -25,7 +25,10 @@ const initSocket = (server) => {
     socket.on('auth:google:callback', (code) => authController.googleCallback(socket, code));
     socket.on('auth:facebook:login', () => authController.facebookLogin(socket));
     socket.on('auth:facebook:callback', (code) => authController.facebookCallback(socket, code));
-    
+    socket.on('auth:verify:loginOTP', (email, otp, verificationToken) => authController.verifyOtpAndLogin(socket, email, otp, verificationToken));
+    socket.on('auth:otp:verify', (data) => authController.verifyOTP(socket, data));
+    socket.on('auth:otp:send', (email) => authController.sendOTP(socket, email));
+
     // Apply authentication middleware for other events
     socket.use((event, next) => {
       // List of events that don't require authentication
@@ -36,6 +39,9 @@ const initSocket = (server) => {
         'auth:google:callback',
         'auth:facebook:login',
         'auth:facebook:callback',
+        'auth:verify:loginOTP',
+        'auth:otp:send',
+        'auth:otp:verify',
         'disconnect'
       ];
       

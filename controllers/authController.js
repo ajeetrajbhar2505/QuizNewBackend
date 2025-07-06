@@ -12,18 +12,48 @@ const register = async (socket, data) => {
   }
 };
 
-const login = async (socket, data) => {
+const login = async (socket, email) => {
   try {
     const sessionInfo = {
       ipAddress: socket.handshake.address,
       userAgent: socket.handshake.headers['user-agent']
     };
-    const result = await authService.loginUser(data.email, sessionInfo);
+    const result = await authService.loginWithOtp(email, sessionInfo);
     socket.emit('auth:login:success', result);
-    logger.info(`User logged in: ${data.email}`);
+    logger.info(`User logged in: ${email}`);
   } catch (error) {
     socket.emit('auth:login:error', { message: error.message });
     logger.error(`Login error: ${error.message}`);
+  }
+};
+
+const verifyOtpAndLogin = async (socket, email, otp, verificationToken) => {
+  try {
+    const sessionInfo = {
+      ipAddress: socket.handshake.address,
+      userAgent: socket.handshake.headers['user-agent']
+    };
+    
+    const result = await authService.verifyOtpAndLogin(
+      email, 
+      otp, 
+      verificationToken, 
+      sessionInfo
+    );
+    
+    socket.emit('auth:otp:verify:success', {
+      token: result.token,
+      user: result.user
+    });
+    
+    logger.info(`OTP verified and user logged in: ${email}`);
+  } catch (error) {
+    socket.emit('auth:otp:verify:error', { 
+      message: error.message,
+      email: email
+    });
+    
+    logger.error(`OTP verification failed for ${email}: ${error.message}`);
   }
 };
 
@@ -127,6 +157,7 @@ module.exports = {
   register,
   login,
   logout,
+  verifyOtpAndLogin,
   googleLogin,
   facebookLogin,
   googleCallback,
