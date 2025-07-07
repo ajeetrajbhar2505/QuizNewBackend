@@ -206,7 +206,7 @@ const loginUser = async (email, password, req) => {
 
     const sessionInfo = {
       ip: req.ip,
-      userAgent: req.headers['user-agent'],
+      userAgent: req.headers['user-agent'] || '',
       loginTime: new Date()
     };
 
@@ -268,7 +268,7 @@ const handleGoogleCallback = async (code, req) => {
 
     const sessionInfo = {
       ip: req.ip,
-      userAgent: req.headers['user-agent'],
+      userAgent: req.headers['user-agent'] || 'user-agent',
       loginTime: new Date()
     };
 
@@ -371,7 +371,7 @@ const handleFacebookCallback = async (code, req) => {
 
     const sessionInfo = {
       ip: req.ip,
-      userAgent: req.headers['user-agent'],
+      userAgent: req.headers['user-agent'] || 'user-agent',
       loginTime: new Date()
     };
 
