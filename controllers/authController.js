@@ -94,38 +94,96 @@ const facebookLogin = async (socket) => {
 
 const googleCallback = async (socket, code) => {
   try {
+    // Implement retry logic for database operations
+    const maxRetries = 3;
+    let retryCount = 0;
+    let success = false;
+    let lastError;
+
     const sessionInfo = {
       ipAddress: socket.handshake.address,
       userAgent: socket.handshake.headers['user-agent']
     };
-    const { token, user } = await authService.handleGoogleCallback(code, sessionInfo);
-    
-    socket.emit('auth:google:success', { token, user });
-    
-    logger.info(`Google login successful for user: ${user.email}`);
+
+    while (retryCount < maxRetries && !success) {
+      try {
+
+        const { token, user } = await authService.handleGoogleCallback(code, sessionInfo);
+        success = true;
+        socket.emit('auth:google:success', { token, user });
+        logger.info(`Google login successful for user: ${user.name}`);
+      } catch (error) {
+        lastError = error;
+        retryCount++;
+        if (retryCount < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 200 * retryCount));
+        }
+      }
+    }
+
+    if (!success) {
+      logger.error(`Google auth failed after ${maxRetries} attempts`, lastError);
+      socket.emit('auth:google:error', {
+        message: 'Authentication failed due to system busy. Please try again later.',
+        retryable: true,
+        originalError: lastError.message
+      });
+    }
   } catch (error) {
-    socket.emit('auth:google:error', { message: error.message });
     logger.error(`Google callback error: ${error.message}`);
+    socket.emit('auth:google:error', {
+      message: 'Authentication failed. Please try again.',
+      retryable: false
+    });
   }
-};
+}
 
 const facebookCallback = async (socket, code) => {
   try {
+    // Implement retry logic for database operations
+    const maxRetries = 3;
+    let retryCount = 0;
+    let success = false;
+    let lastError;
+
     const sessionInfo = {
       ipAddress: socket.handshake.address,
       userAgent: socket.handshake.headers['user-agent']
     };
-    const { token, user } = await authService.handleFacebookCallback(code, sessionInfo);
-    
-    socket.emit('auth:facebook:success', { token, user });
-    logger.info(`Facebook login successful for user: ${user.name}`);
+
+    while (retryCount < maxRetries && !success) {
+      try {
+
+        const { token, user } = await authService.handleFacebookCallback(code, sessionInfo);
+        socket.emit('auth:facebook:success', { token, user });
+        logger.info(`Facebook login successful for user: ${user.name}`);
+        success = true;
+        socket.emit('auth:facebook:success', user);
+      } catch (error) {
+        lastError = error;
+        retryCount++;
+        if (retryCount < maxRetries) {
+          await new Promise(resolve => setTimeout(resolve, 200 * retryCount));
+        }
+      }
+    }
+
+    if (!success) {
+      logger.error(`Facebook auth failed after ${maxRetries} attempts`, lastError);
+      socket.emit('auth:facebook:error', {
+        message: 'Authentication failed due to system busy. Please try again later.',
+        retryable: true,
+        originalError: lastError.message
+      });
+    }
   } catch (error) {
-    socket.emit('auth:facebook:error', { 
-      message: error.message || 'Facebook authentication failed' 
+    logger.error('Facebook callback error:', error);
+    socket.emit('auth:facebook:error', {
+      message: 'Authentication failed. Please try again.',
+      retryable: false
     });
-    logger.error(`Facebook callback error: ${error.message}`);
   }
-};
+}
 
 const sendOTP = async (socket, email) => {
   try {
