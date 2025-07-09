@@ -283,7 +283,7 @@ const handleGoogleCallback = async (code, req) => {
             $addToSet: { loginHistory: sessionInfo },
             lastLoginAt: new Date()
           },
-          { new: true, session }
+          { new: true,yield: true, session }
         );
       } else {
         user = await User.findOneAndUpdate(
@@ -292,7 +292,7 @@ const handleGoogleCallback = async (code, req) => {
             $addToSet: { loginHistory: sessionInfo },
             lastLoginAt: new Date()
           },
-          { new: true, session }
+          { new: true,yield: true, session }
         );
       }
     } else {
@@ -394,7 +394,7 @@ const handleFacebookCallback = async (code, req) => {
       user = await User.findOneAndUpdate(
         { _id: user._id },
         update,
-        { new: true, session }
+        { new: true,yield: true, session }
       );
     } else {
       user = new User({
