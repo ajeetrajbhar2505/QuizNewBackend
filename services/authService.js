@@ -268,7 +268,7 @@ const handleGoogleCallback = async (code, req) => {
 
     const sessionInfo = {
       ip: req.ip,
-      userAgent:  req.headers && req.headers['User-gent'] ? req.headers['User-gent'] :  req.headers['sec-ch-ua'] || 'user-agent',
+      userAgent:  'user-agent',
       loginTime: new Date()
     };
 
@@ -371,7 +371,7 @@ const handleFacebookCallback = async (code, req) => {
 
     const sessionInfo = {
       ip: req.ip,
-      userAgent:  req.headers && req.headers['User-gent'] ? req.headers['User-gent'] :  req.headers['sec-ch-ua'] || 'user-agent',
+      userAgent:  'user-agent',
       loginTime: new Date()
     };
 
