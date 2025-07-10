@@ -19,7 +19,6 @@ const userStatsSchema = new mongoose.Schema({
   }],
 }, { timestamps: true });
 
-module.exports = mongoose.model('UserStats', userStatsSchema);
 
 userStatsSchema.methods.updateStreak = function() {
   const now = new Date();
@@ -60,3 +59,6 @@ userStatsSchema.methods.updateStreak = function() {
 
   this.streak.lastUpdated = currentDate;
 };
+
+const UserStats = mongoose.model('UserStats', userStatsSchema);
+module.exports = UserStats;

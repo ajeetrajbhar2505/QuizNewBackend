@@ -172,7 +172,13 @@ const verifyOtpAndLogin = async (email, otp, verificationToken, req) => {
     user.markAsLoggedIn(sessionInfo);
     await user.save({ session });
 
-    userStats.updateStreak();
+    const stats = await UserStats.findOneAndUpdate(
+      { user: user.id },
+      { $set: { lastActive: new Date() } },
+      { new: true, upsert: true }
+    );
+
+    stats.updateStreak();
     await stats.save();
 
     // Generate final auth token
@@ -216,6 +222,15 @@ const loginUser = async (email, password, req) => {
 
     user.markAsLoggedIn(sessionInfo);
     await user.save({ session });
+
+    const stats = await UserStats.findOneAndUpdate(
+      { user: user.id },
+      { $set: { lastActive: new Date() } },
+      { new: true, upsert: true }
+    );
+
+    stats.updateStreak();
+    await stats.save({ session });
 
     const token = generateToken(user);
     const userResponse = user.toObject();
@@ -311,17 +326,16 @@ const handleGoogleCallback = async (code, req) => {
       });
       user.markAsLoggedIn(sessionInfo);
       await user.save({ session });
-
-      const userStats = new UserStats({
-        user: user._id,
-        lastActive: new Date()
-      });
-      await userStats.save({ session });
-
     }
 
-    userStats.updateStreak();
-    await stats.save();
+    const stats = await UserStats.findOneAndUpdate(
+      { user: user.id },
+      { $set: { lastActive: new Date() } },
+      { new: true, upsert: true }
+    );
+
+    stats.updateStreak();
+    await stats.save({ session });
 
     const token = generateToken(user);
     const userResponse = user.toObject();
@@ -423,17 +437,17 @@ const handleFacebookCallback = async (code, req) => {
       });
       user.markAsLoggedIn(sessionInfo);
       await user.save({ session });
-
-      const userStats = new UserStats({
-        user: user._id,
-        lastActive: new Date()
-      });
-      await userStats.save({ session });
     }
 
 
-    userStats.updateStreak();
-    await stats.save();
+    const stats = await UserStats.findOneAndUpdate(
+      { user: user.id },
+      { $set: { lastActive: new Date() } },
+      { new: true, upsert: true }
+    );
+
+    stats.updateStreak();
+    await stats.save({ session });
     
     const token = generateToken(user);
     const userResponse = user.toObject();
