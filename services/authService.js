@@ -172,14 +172,27 @@ const verifyOtpAndLogin = async (email, otp, verificationToken, req) => {
     user.markAsLoggedIn(sessionInfo);
     await user.save({ session });
 
+
     const stats = await UserStats.findOneAndUpdate(
-      { user: user.id },
-      { $set: { lastActive: new Date() } },
-      { new: true, upsert: true }
+      { user: user._id },
+      { 
+        $set: { lastActive: new Date() },
+        $setOnInsert: { 
+          streak: {
+            current: 1,
+            lastUpdated: new Date()
+          }
+        }
+      },
+      { 
+        new: true, 
+        upsert: true, 
+        session 
+      }
     );
 
     stats.updateStreak();
-    await stats.save();
+    await stats.save({ session });
 
     // Generate final auth token
     const authToken = generateToken(user);
@@ -223,10 +236,24 @@ const loginUser = async (email, password, req) => {
     user.markAsLoggedIn(sessionInfo);
     await user.save({ session });
 
+ 
+
     const stats = await UserStats.findOneAndUpdate(
-      { user: user.id },
-      { $set: { lastActive: new Date() } },
-      { new: true, upsert: true }
+      { user: user._id },
+      { 
+        $set: { lastActive: new Date() },
+        $setOnInsert: { 
+          streak: {
+            current: 1,
+            lastUpdated: new Date()
+          }
+        }
+      },
+      { 
+        new: true, 
+        upsert: true, 
+        session 
+      }
     );
 
     stats.updateStreak();
@@ -315,6 +342,28 @@ const handleGoogleCallback = async (code, req) => {
           { new: true, yield: true, session }
         );
       }
+
+      const stats = await UserStats.findOneAndUpdate(
+        { user: user._id },
+        { 
+          $set: { lastActive: new Date() },
+          $setOnInsert: { 
+            streak: {
+              current: 1,
+              lastUpdated: new Date()
+            }
+          }
+        },
+        { 
+          new: true, 
+          upsert: true, 
+          session 
+        }
+      );
+
+      stats.updateStreak();
+      await stats.save({ session });
+
     } else {
       user = new User({
         name,
@@ -326,16 +375,19 @@ const handleGoogleCallback = async (code, req) => {
       });
       user.markAsLoggedIn(sessionInfo);
       await user.save({ session });
+
+      const stats = new UserStats({
+        user: user._id,
+        lastActive: new Date(),
+        streak: {
+          current: 1,
+          lastUpdated: new Date()
+        }
+      });
+      await stats.save({ session });
     }
 
-    const stats = await UserStats.findOneAndUpdate(
-      { user: user.id },
-      { $set: { lastActive: new Date() } },
-      { new: true, upsert: true }
-    );
 
-    stats.updateStreak();
-    await stats.save({ session });
 
     const token = generateToken(user);
     const userResponse = user.toObject();
@@ -426,6 +478,28 @@ const handleFacebookCallback = async (code, req) => {
         update,
         { new: true, yield: true, session }
       );
+
+      const stats = await UserStats.findOneAndUpdate(
+        { user: user._id },
+        { 
+          $set: { lastActive: new Date() },
+          $setOnInsert: { 
+            streak: {
+              current: 1,
+              lastUpdated: new Date()
+            }
+          }
+        },
+        { 
+          new: true, 
+          upsert: true, 
+          session 
+        }
+      );
+
+      stats.updateStreak();
+      await stats.save({ session });
+
     } else {
       user = new User({
         name,
@@ -437,17 +511,18 @@ const handleFacebookCallback = async (code, req) => {
       });
       user.markAsLoggedIn(sessionInfo);
       await user.save({ session });
+
+      const stats = new UserStats({
+        user: user._id,
+        lastActive: new Date(),
+        streak: {
+          current: 1,
+          lastUpdated: new Date()
+        }
+      });
+      await stats.save({ session });
     }
 
-
-    const stats = await UserStats.findOneAndUpdate(
-      { user: user.id },
-      { $set: { lastActive: new Date() } },
-      { new: true, upsert: true }
-    );
-
-    stats.updateStreak();
-    await stats.save({ session });
     
     const token = generateToken(user);
     const userResponse = user.toObject();
