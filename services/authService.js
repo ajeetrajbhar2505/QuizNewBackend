@@ -303,7 +303,6 @@ const handleGoogleCallback = async (code, req) => {
         googleId,
         avatar,
         isVerified: true,
-        loginHistory: [sessionInfo],
         lastLoginAt: new Date()
       });
       user.markAsLoggedIn(sessionInfo);
@@ -406,7 +405,6 @@ const handleFacebookCallback = async (code, req) => {
         facebookId,
         avatar,
         isVerified: true,
-        loginHistory: [sessionInfo],
         lastLoginAt: new Date()
       });
       user.markAsLoggedIn(sessionInfo);
