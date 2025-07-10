@@ -20,8 +20,8 @@ const transporter = nodemailer.createTransport({
 });
 
 const googleClient = new OAuth2Client(
-  process.env.GOOGLE_CLIENT_ID, 
-  process.env.GOOGLE_CLIENT_SECRET, 
+  process.env.GOOGLE_CLIENT_ID,
+  process.env.GOOGLE_CLIENT_SECRET,
   process.env.GOOGLE_REDIRECT_URL
 );
 
@@ -219,7 +219,7 @@ const loginUser = async (email, password, req) => {
     await session.commitTransaction();
     session.endSession();
 
-    return { 
+    return {
       success: true,
       token,
       user: userResponse
@@ -268,7 +268,7 @@ const handleGoogleCallback = async (code, req) => {
 
     const sessionInfo = {
       ip: req.ip,
-      userAgent:  'user-agent',
+      userAgent: 'user-agent',
       loginTime: new Date()
     };
 
@@ -278,21 +278,21 @@ const handleGoogleCallback = async (code, req) => {
       if (!user.googleId) {
         user = await User.findOneAndUpdate(
           { _id: user._id },
-          { 
+          {
             $set: { googleId, avatar },
             $addToSet: { loginHistory: sessionInfo },
             lastLoginAt: new Date()
           },
-          { new: true,yield: true, session }
+          { new: true, yield: true, session }
         );
       } else {
         user = await User.findOneAndUpdate(
           { _id: user._id },
-          { 
+          {
             $addToSet: { loginHistory: sessionInfo },
             lastLoginAt: new Date()
           },
-          { new: true,yield: true, session }
+          { new: true, yield: true, session }
         );
       }
     } else {
@@ -305,6 +305,7 @@ const handleGoogleCallback = async (code, req) => {
         loginHistory: [sessionInfo],
         lastLoginAt: new Date()
       });
+      user.markAsLoggedIn(sessionInfo);
       await user.save({ session });
     }
 
@@ -315,10 +316,10 @@ const handleGoogleCallback = async (code, req) => {
     session.endSession();
 
     logger.info(`Google login successful for user: ${email}`);
-    return { 
+    return {
       success: true,
-      token, 
-      user: userResponse 
+      token,
+      user: userResponse
     };
 
   } catch (error) {
@@ -335,7 +336,7 @@ const handleFacebookCallback = async (code, req) => {
 
   try {
     // Exchange code for access token
-    const tokenUrl = `https://graph.facebook.com/v19.0/oauth/access_token?` + 
+    const tokenUrl = `https://graph.facebook.com/v19.0/oauth/access_token?` +
       querystring.stringify({
         client_id: process.env.FACEBOOK_APP_ID,
         client_secret: process.env.FACEBOOK_APP_SECRET,
@@ -351,7 +352,7 @@ const handleFacebookCallback = async (code, req) => {
     }
 
     // Get user profile
-    const profileUrl = `https://graph.facebook.com/me?` + 
+    const profileUrl = `https://graph.facebook.com/me?` +
       querystring.stringify({
         fields: 'id,name,email,picture.width(500).height(500)',
         access_token: tokenData.access_token
@@ -371,7 +372,7 @@ const handleFacebookCallback = async (code, req) => {
 
     const sessionInfo = {
       ip: req.ip,
-      userAgent:  'user-agent',
+      userAgent: 'user-agent',
       loginTime: new Date()
     };
 
@@ -386,7 +387,7 @@ const handleFacebookCallback = async (code, req) => {
           ...(!user.facebookId && { facebookId }),
           ...(!user.avatar?.includes('http') && { avatar })
         },
-        $addToSet: { 
+        $addToSet: {
           loginHistory: sessionInfo
         }
       };
@@ -394,7 +395,7 @@ const handleFacebookCallback = async (code, req) => {
       user = await User.findOneAndUpdate(
         { _id: user._id },
         update,
-        { new: true,yield: true, session }
+        { new: true, yield: true, session }
       );
     } else {
       user = new User({
@@ -406,6 +407,7 @@ const handleFacebookCallback = async (code, req) => {
         loginHistory: [sessionInfo],
         lastLoginAt: new Date()
       });
+      user.markAsLoggedIn(sessionInfo);
       await user.save({ session });
     }
 
@@ -416,10 +418,10 @@ const handleFacebookCallback = async (code, req) => {
     session.endSession();
 
     logger.info(`Facebook login successful for user: ${user._id}`);
-    return { 
+    return {
       success: true,
-      token, 
-      user: userResponse 
+      token,
+      user: userResponse
     };
 
   } catch (error) {
@@ -516,7 +518,7 @@ const verifyOtp = async (email, otp, verificationToken, req) => {
     });
 
     // Find the OTP record
-    const otpDoc = await Otp.findOne({ 
+    const otpDoc = await Otp.findOne({
       email,
       expiresAt: { $gt: new Date() }
     }).session(session);
@@ -581,7 +583,7 @@ module.exports = {
   registerUser,
   loginUser,
   loginWithOtp,
-  sendOtp,verifyOtp,
+  sendOtp, verifyOtp,
   verifyOtpAndLogin,
   logoutUser,
   generateGoogleAuthUrl,
