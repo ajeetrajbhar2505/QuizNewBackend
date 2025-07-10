@@ -290,7 +290,8 @@ const handleGoogleCallback = async (code, req) => {
           { _id: user._id },
           {
             $addToSet: { loginHistory: sessionInfo },
-            lastLoginAt: new Date()
+            lastLoginAt: new Date(),
+            isLoggedIn : true
           },
           { new: true, yield: true, session }
         );
@@ -384,6 +385,7 @@ const handleFacebookCallback = async (code, req) => {
       const update = {
         $set: {
           lastLoginAt: new Date(),
+          isLoggedIn : true,
           ...(!user.facebookId && { facebookId }),
           ...(!user.avatar?.includes('http') && { avatar })
         },
