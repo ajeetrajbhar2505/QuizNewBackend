@@ -172,6 +172,9 @@ const verifyOtpAndLogin = async (email, otp, verificationToken, req) => {
     user.markAsLoggedIn(sessionInfo);
     await user.save({ session });
 
+    userStats.updateStreak();
+    await stats.save();
+
     // Generate final auth token
     const authToken = generateToken(user);
     const userResponse = user.toObject();
@@ -317,6 +320,9 @@ const handleGoogleCallback = async (code, req) => {
 
     }
 
+    userStats.updateStreak();
+    await stats.save();
+
     const token = generateToken(user);
     const userResponse = user.toObject();
 
@@ -425,6 +431,10 @@ const handleFacebookCallback = async (code, req) => {
       await userStats.save({ session });
     }
 
+
+    userStats.updateStreak();
+    await stats.save();
+    
     const token = generateToken(user);
     const userResponse = user.toObject();
 
