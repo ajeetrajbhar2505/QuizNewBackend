@@ -24,12 +24,12 @@ const authenticate = async (socket, next) => {
 
     // Attach user to socket
     socket.user = {
-      _id: decoded._id,
+      _id: decoded.userId,
       email: decoded.email,
       // other relevant user data
     };
 
-    logger.info(`Socket authenticated for user ${decoded._id}`);
+    logger.info(`Socket authenticated for user ${decoded.userId}`);
     next();
   } catch (err) {
     logger.error('Socket authentication error:', {

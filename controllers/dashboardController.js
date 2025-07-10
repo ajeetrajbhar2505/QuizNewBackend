@@ -3,7 +3,7 @@ const logger = require('../config/logger');
 
 const getDashboardStats = async (socket) => {
   try {
-    const stats = await dashboardService.getUserStats(socket.user.id);
+    const stats = await dashboardService.getUserStats(socket.user._id);
     socket.emit('dashboard:stats:success', { stats });
   } catch (error) {
     socket.emit('dashboard:stats:error', { error: error.message });

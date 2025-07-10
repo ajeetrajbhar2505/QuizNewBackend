@@ -7,6 +7,7 @@ const { OAuth2Client } = require('google-auth-library');
 const axios = require('axios');
 const querystring = require('querystring');
 const User = require('../models/User');
+const UserStats = require('../models/UserStats');
 const Otp = require('../models/Otp');
 const logger = require('../config/logger');
 
@@ -307,6 +308,13 @@ const handleGoogleCallback = async (code, req) => {
       });
       user.markAsLoggedIn(sessionInfo);
       await user.save({ session });
+
+      const userStats = new UserStats({
+        user: user._id,
+        lastActive: new Date()
+      });
+      await userStats.save({ session });
+
     }
 
     const token = generateToken(user);
@@ -409,6 +417,12 @@ const handleFacebookCallback = async (code, req) => {
       });
       user.markAsLoggedIn(sessionInfo);
       await user.save({ session });
+
+      const userStats = new UserStats({
+        user: user._id,
+        lastActive: new Date()
+      });
+      await userStats.save({ session });
     }
 
     const token = generateToken(user);
