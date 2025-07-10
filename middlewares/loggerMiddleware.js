@@ -3,15 +3,15 @@ const ApiLog = require('../models/ApiLog');
 
 const logRequest = async (socket, event, duration, status = 200) => {
   try {
-    await ApiLog.create({
-      endpoint: event,
-      method: 'SOCKET',
-      statusCode: status,
-      responseTime: duration,
-      user: socket.user?.id,
-      ipAddress: socket.handshake.address,
-      userAgent: socket.handshake.headers['user-agent'],
-    });
+    // await ApiLog.create({
+    //   endpoint: event,
+    //   method: 'SOCKET',
+    //   statusCode: status,
+    //   responseTime: duration,
+    //   user: socket.user?.id,
+    //   ipAddress: socket.handshake.address,
+    //   userAgent: socket.handshake.headers['user-agent'],
+    // });
   } catch (err) {
     logger.error('Failed to log socket request:', err);
   }
