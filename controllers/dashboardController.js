@@ -21,7 +21,19 @@ const getRecentActivity = async (socket) => {
   }
 };
 
+const getLeaderboardUser = async (socket) => {
+  try {
+    const leaderboard = await dashboardService.getLeaderboardUser();
+    socket.emit('dashboard:leaderboardUser:success', { leaderboard });
+  } catch (error) {
+    socket.emit('dashboard:leaderboardUser:error', { error: error.message });
+    logger.error(`Get recent activity error: ${error.message}`);
+  }
+};
+
+
 module.exports = {
   getDashboardStats,
   getRecentActivity,
+  getLeaderboardUser
 };
