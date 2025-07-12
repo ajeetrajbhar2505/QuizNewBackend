@@ -10,7 +10,6 @@ const setupAuthRoutes = require('./routes/authRoutes');
 const setupQuizRoutes = require('./routes/quizRoutes');
 const setupUserRoutes = require('./routes/userRoutes');
 const setupPaymentRoutes = require('./routes/paymentRoutes');
-const setupAiQuizRoutes = require('./routes/aiQuizRoutes');
 const setupNotificationRoutes = require('./routes/notificationRoutes');
 const setupDashboardRoutes = require('./routes/dashboardRoutes');
 const oauthRoutes = require('./routes/oauthRoutes');
@@ -38,7 +37,6 @@ io.on('connection', (socket) => {
   setupQuizRoutes(socket);
   setupUserRoutes(socket);
   setupPaymentRoutes(socket);
-  setupAiQuizRoutes(socket);
   setupNotificationRoutes(socket);
   setupDashboardRoutes(socket);
 

@@ -4,7 +4,7 @@ const { getIO } = require('../config/socket');
 
 const getNotifications = async (socket) => {
   try {
-    const notifications = await notificationService.getUserNotifications(socket.user.id);
+    const notifications = await notificationService.getUserNotifications(socket.user._id);
     socket.emit('notification:get:success', { notifications });
   } catch (error) {
     socket.emit('notification:get:error', { error: error.message });
@@ -14,7 +14,7 @@ const getNotifications = async (socket) => {
 
 const markAsRead = async (socket, notificationId) => {
   try {
-    await notificationService.markNotificationAsRead(socket.user.id, notificationId);
+    await notificationService.markNotificationAsRead(socket.user._id, notificationId);
     socket.emit('notification:read:success', { notificationId });
     logger.info(`Notification marked as read: ${notificationId}`);
   } catch (error) {

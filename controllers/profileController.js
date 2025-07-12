@@ -3,7 +3,7 @@ const logger = require('../config/logger');
 
 const getProfile = async (socket) => {
   try {
-    const profile = await profileService.getUserProfile(socket.user.id);
+    const profile = await profileService.getUserProfile(socket.user._id);
     socket.emit('profile:get:success', { profile });
   } catch (error) {
     socket.emit('profile:get:error', { error: error.message });
@@ -13,9 +13,9 @@ const getProfile = async (socket) => {
 
 const updateProfile = async (socket, data) => {
   try {
-    const profile = await profileService.updateProfile(socket.user.id, data);
+    const profile = await profileService.updateProfile(socket.user._id, data);
     socket.emit('profile:update:success', { profile });
-    logger.info(`Profile updated for user ${socket.user.id}`);
+    logger.info(`Profile updated for user ${socket.user._id}`);
   } catch (error) {
     socket.emit('profile:update:error', { error: error.message });
     logger.error(`Update profile error: ${error.message}`);
@@ -24,7 +24,7 @@ const updateProfile = async (socket, data) => {
 
 const getBadges = async (socket) => {
   try {
-    const badges = await profileService.getUserBadges(socket.user.id);
+    const badges = await profileService.getUserBadges(socket.user._id);
     socket.emit('profile:badges:success', { badges });
   } catch (error) {
     socket.emit('profile:badges:error', { error: error.message });

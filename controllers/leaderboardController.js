@@ -13,7 +13,7 @@ const getGlobalLeaderboard = async (socket) => {
 
 const getFriendLeaderboard = async (socket) => {
   try {
-    const leaderboard = await leaderboardService.getFriendLeaderboard(socket.user.id);
+    const leaderboard = await leaderboardService.getFriendLeaderboard(socket.user._id);
     socket.emit('leaderboard:friends:success', { leaderboard });
   } catch (error) {
     socket.emit('leaderboard:friends:error', { error: error.message });

@@ -13,9 +13,9 @@ const getUserProfile = async (socket, userId) => {
 
 const updateProfile = async (socket, data) => {
   try {
-    const user = await userService.updateProfile(socket.user.id, data);
+    const user = await userService.updateProfile(socket.user._id, data);
     socket.emit('user:update:success', { user });
-    logger.info(`User profile updated: ${socket.user.id}`);
+    logger.info(`User profile updated: ${socket.user._id}`);
   } catch (error) {
     socket.emit('user:update:error', { error: error.message });
     logger.error(`Update profile error: ${error.message}`);
@@ -24,7 +24,7 @@ const updateProfile = async (socket, data) => {
 
 const getFriends = async (socket) => {
   try {
-    const friends = await userService.getFriends(socket.user.id);
+    const friends = await userService.getFriends(socket.user._id);
     socket.emit('user:friends:success', { friends });
   } catch (error) {
     socket.emit('user:friends:error', { error: error.message });

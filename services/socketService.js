@@ -5,17 +5,17 @@ const activeSockets = new Map(); // userId -> socketId mapping
 
 const registerSocket = (socket) => {
   if (socket.user?.id) {
-    activeSockets.set(socket.user.id, socket.id);
-    socket.join(`user_${socket.user.id}`);
-    logger.info(`Socket registered for user ${socket.user.id}`);
+    activeSockets.set(socket.user._id, socket.id);
+    socket.join(`user_${socket.user._id}`);
+    logger.info(`Socket registered for user ${socket.user._id}`);
   }
 };
 
 const unregisterSocket = (socket) => {
   if (socket.user?.id) {
-    activeSockets.delete(socket.user.id);
-    socket.leave(`user_${socket.user.id}`);
-    logger.info(`Socket unregistered for user ${socket.user.id}`);
+    activeSockets.delete(socket.user._id);
+    socket.leave(`user_${socket.user._id}`);
+    logger.info(`Socket unregistered for user ${socket.user._id}`);
   }
 };
 

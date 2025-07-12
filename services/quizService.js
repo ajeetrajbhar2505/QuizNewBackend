@@ -3,9 +3,15 @@ const ActiveQuiz = require('../models/ActiveQuiz');
 const UserStats = require('../models/UserStats');
 const logger = require('../config/logger');
 const { getIO } = require('../config/socket');
+const AimlQuizService = require('./openai.service');
 
-const createQuiz = async (quizData, userId) => {
-  const quiz = await Quiz.create({ ...quizData, createdBy: userId });
+const createQuiz = async (data, userId) => {
+  const quizData = await AimlQuizService.generateQuiz(data.prompt);
+  const quiz = await Quiz.create({
+    ...quizData,
+    createdBy: userId,
+    source: 'openai'
+  });
   return quiz;
 };
 

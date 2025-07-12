@@ -13,7 +13,7 @@ const getDashboardStats = async (socket) => {
 
 const getRecentActivity = async (socket) => {
   try {
-    const activity = await dashboardService.getRecentActivity(socket.user.id);
+    const activity = await dashboardService.getRecentActivity(socket.user._id);
     socket.emit('dashboard:activity:success', { activity });
   } catch (error) {
     socket.emit('dashboard:activity:error', { error: error.message });
