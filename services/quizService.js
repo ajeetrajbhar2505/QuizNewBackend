@@ -21,12 +21,12 @@ const getAllQuiz = async (userId) => {
 
     const quizzes = await Quiz.find(
       { createdBy: userId },
-      { 
+      {
         difficulty: 1,
         title: 1,
         totalQuestions: 1,
         category: 1,
-        description : 1,
+        description: 1,
         isPublic: 1,
         _id: 1
       }
@@ -49,7 +49,7 @@ const getQuizById = async (quizId) => {
 };
 
 
-const publishQuizById = async (quizId, userId) => {
+const publishQuizById = async (quizId, userId, publish, approvalStatus) => {
   try {
     const quiz = await Quiz.findOne({
       _id: quizId,
@@ -62,13 +62,14 @@ const publishQuizById = async (quizId, userId) => {
 
     const updatedQuiz = await Quiz.findByIdAndUpdate(
       quizId,
-      { 
-        $set: { 
-          isPublic: true,
-          updatedAt: new Date() 
-        } 
+      {
+        $set: {
+          isPublic: publish,
+          approvalStatus: approvalStatus,
+          updatedAt: new Date()
+        }
       },
-      { new: true } 
+      { new: true }
     );
 
     return updatedQuiz;
@@ -80,7 +81,7 @@ const publishQuizById = async (quizId, userId) => {
 
 const startQuiz = async (quizId, userId) => {
   const quiz = await getQuizById(quizId);
-  
+
   const activeQuiz = await ActiveQuiz.create({
     quiz: quiz._id,
     host: userId,
@@ -176,10 +177,10 @@ function transformGeminiResponseToQuiz(geminiResponse, userId) {
     return {
       question: question.questionText,
       options: optionsArray,
-      correctAnswer: optionsArray[['a','b','c','d'].indexOf(question.correctAnswer)],
+      correctAnswer: optionsArray[['a', 'b', 'c', 'd'].indexOf(question.correctAnswer)],
       explanation: question.explanation,
-      points: question.points || 10, 
-      timeLimit : question.timeLimit
+      points: question.points || 10,
+      timeLimit: question.timeLimit
     };
   });
 
@@ -190,9 +191,9 @@ function transformGeminiResponseToQuiz(geminiResponse, userId) {
     category: geminiResponse.category,
     difficulty: geminiResponse.title.split(' ')[0].toLowerCase(),
     questions: transformedQuestions,
-    estimatedTime:geminiResponse.estimatedTime,
-    source : geminiResponse.source,
-    totalQuestions : geminiResponse.totalQuestions,
+    estimatedTime: geminiResponse.estimatedTime,
+    source: geminiResponse.source,
+    totalQuestions: geminiResponse.totalQuestions,
     createdBy: userId,
     isPublic: true,
     createdAt: new Date(),

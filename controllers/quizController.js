@@ -35,9 +35,9 @@ const getQuiz = async (socket, quizId) => {
   }
 };
 
-const publish = async (socket, quizId) => {
+const publish = async (socket, quizId, publish, approvalStatus) => {
   try {
-    const quiz = await quizService.publishQuizById(quizId);
+    const quiz = await quizService.publishQuizById(quizId, socket.user._id, publish, approvalStatus);
     socket.emit('quiz:publish:success', { quiz });
   } catch (error) {
     socket.emit('quiz:get:error', { error: error.message });
