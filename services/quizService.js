@@ -191,6 +191,7 @@ function transformGeminiResponseToQuiz(geminiResponse, userId) {
     difficulty: geminiResponse.title.split(' ')[0].toLowerCase(),
     questions: transformedQuestions,
     estimatedTime:geminiResponse.estimatedTime,
+    source : geminiResponse.source,
     createdBy: userId,
     isPublic: true,
     createdAt: new Date(),
