@@ -12,6 +12,23 @@ const createQuiz = async (data, userId) => {
   return newQuiz;
 };
 
+const refreshQuestion = async (userId,quizId,questionIndex) => {
+  const geminiResponse = await AimlQuizService.refreshQuestion(quizId,userId,questionIndex);
+   await Quiz.findByIdAndUpdate(
+    quizId,
+    { 
+      $set: { 
+        [`questions.${questionIndex}`]: geminiResponse,
+        updatedAt: new Date()
+      }
+    },
+    { new: true }
+  );
+
+  return geminiResponse;
+};
+
+
 
 const getAllQuiz = async (userId) => {
   try {
@@ -28,6 +45,7 @@ const getAllQuiz = async (userId) => {
         category: 1,
         description: 1,
         isPublic: 1,
+        approvalStatus:1,
         _id: 1
       }
     ).lean().exec();
@@ -208,6 +226,42 @@ function transformGeminiResponseToQuiz(geminiResponse, userId) {
   return quizDoc;
 }
 
+function transformGeminiResponseToQuestion(geminiResponse, userId) {
+  // Transform each question to match your schema
+  const transformedQuestions = geminiResponse.questions.map(question => {
+    // Convert options object to array while preserving order
+    const optionsArray = [
+      question.options.a,
+      question.options.b,
+      question.options.c,
+      question.options.d
+    ];
+
+    return {
+      question: question.questionText,
+      options: optionsArray,
+      correctAnswer: optionsArray[['a', 'b', 'c', 'd'].indexOf(question.correctAnswer)],
+      explanation: question.explanation,
+      points: question.points || 10,
+      timeLimit: question.timeLimit
+    };
+  });
+
+  // Create the quiz document
+  const quizDoc = {
+    questions: transformedQuestions,
+    createdBy: userId,
+    updatedAt: new Date()
+  };
+
+  // Validate difficulty
+  if (!['easy', 'medium', 'hard'].includes(quizDoc.difficulty)) {
+    quizDoc.difficulty = 'medium';
+  }
+
+  return quizDoc;
+}
+
 
 module.exports = {
   createQuiz,
@@ -215,5 +269,6 @@ module.exports = {
   startQuiz,
   submitAnswer,
   getAllQuiz,
-  publishQuizById
+  publishQuizById,
+  refreshQuestion
 };

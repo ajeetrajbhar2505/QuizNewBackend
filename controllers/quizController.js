@@ -13,6 +13,17 @@ const createQuiz = async (socket, data) => {
   }
 };
 
+const refreshQuestion = async (socket, quizId,questionIndex) => {
+  try {
+    const quiz = await quizService.refreshQuestion(socket.user._id,quizId,questionIndex);
+    socket.emit('quiz:refreshQuestion:success', { quiz });
+    logger.info(`Quiz created by user ${socket.user._id}`);
+  } catch (error) {
+    socket.emit('quiz:create:error', { error: error.message });
+    logger.error(`Quiz creation error: ${error.message}`);
+  }
+};
+
 const getAllQuiz = async (socket) => {
   try {
     const quizes = await quizService.getAllQuiz(socket.user._id);
@@ -78,5 +89,6 @@ module.exports = {
   startQuiz,
   submitAnswer,
   getAllQuiz,
-  publish
+  publish,
+  refreshQuestion
 };

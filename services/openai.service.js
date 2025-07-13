@@ -1,5 +1,6 @@
 const { model } = require('../config/openai.config');
 const QUESTION_CACHE = new Map();
+const Quiz = require('../models/Quiz');
 
 class AIService {
   /**
@@ -262,6 +263,94 @@ class AIService {
   static _delay(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
+
+ 
+  static async refreshQuestion(quizId, userId, questionIndex) {
+    try {
+      // 1. Get the original quiz to maintain context
+      const quiz = await Quiz.findById(quizId).lean();
+      if (!quiz) {
+        throw new Error('Quiz not found');
+      }
+
+      // 2. Generate a new question matching the original parameters
+      const prompt = this._buildRefreshPrompt(
+        quiz.topic,
+        quiz.difficulty,
+        quiz.questions[questionIndex]
+      );
+
+      // 3. Get new question from AI
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+
+      // 4. Parse and validate the response
+      const newQuestion = this._parseQuestionResponse(text);
+      
+      // 5. Transform to database format
+      const transformedQuestion = {
+        question: newQuestion.questionText,
+        options: [
+          newQuestion.options.a,
+          newQuestion.options.b,
+          newQuestion.options.c,
+          newQuestion.options.d
+        ],
+        correctAnswer: newQuestion.options[newQuestion.correctAnswer],
+        explanation: newQuestion.explanation,
+        points: newQuestion.points || 10,
+        timeLimit: this._calculateTimePerQuestion(quiz.difficulty),
+        createdAt: new Date(),
+        createdBy: userId
+      };
+
+      return transformedQuestion;
+
+    } catch (error) {
+      console.error('Error refreshing question:', error);
+      throw new Error('Failed to generate new question');
+    }
+  }
+
+
+   static _buildRefreshPrompt(topic, difficulty, originalQuestion) {
+    return `Generate a new ${difficulty} difficulty quiz question about ${topic} to replace this existing question:
+    
+    Original Question: "${originalQuestion.question}"
+    
+    Requirements:
+    - Same difficulty level (${difficulty})
+    - Same topic (${topic})
+    - Different question text
+    - 4 distinct options (a, b, c, d)
+    - Clear correct answer
+    - Brief explanation (20-30 words)
+    
+    Format response as JSON:
+    {
+      "questionText": "...",
+      "options": { "a": "...", "b": "...", "c": "...", "d": "..." },
+      "correctAnswer": "a/b/c/d",
+      "explanation": "..."
+    }`;
+  }
+
+   static _parseQuestionResponse(text) {
+    try {
+      const cleaned = text.replace(/```json|```/g, '').trim();
+      const question = JSON.parse(cleaned);
+      if (!question.questionText || !question.options || !question.correctAnswer) {
+        throw new Error('Invalid question format from AI');
+      }
+      
+      return question;
+    } catch (error) {
+      console.error('Failed to parse question:', error);
+      throw new Error('Invalid question format received from AI');
+    }
+  }
+
 }
 
 module.exports = AIService;
