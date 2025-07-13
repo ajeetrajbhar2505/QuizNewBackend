@@ -178,7 +178,8 @@ function transformGeminiResponseToQuiz(geminiResponse, userId) {
       options: optionsArray,
       correctAnswer: optionsArray[['a','b','c','d'].indexOf(question.correctAnswer)],
       explanation: question.explanation,
-      points: question.points || 10 
+      points: question.points || 10, 
+      timeLimit : question.timeLimit
     };
   });
 
@@ -189,6 +190,7 @@ function transformGeminiResponseToQuiz(geminiResponse, userId) {
     category: geminiResponse.category,
     difficulty: geminiResponse.title.split(' ')[0].toLowerCase(),
     questions: transformedQuestions,
+    estimatedTime:geminiResponse.estimatedTime,
     createdBy: userId,
     isPublic: true,
     createdAt: new Date(),
