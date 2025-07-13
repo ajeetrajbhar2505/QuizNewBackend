@@ -66,6 +66,27 @@ const getQuizById = async (quizId) => {
   return quiz;
 };
 
+const deleteQuiz = async (quizId, userId) => {
+  const quiz = await Quiz.findOne({
+    _id: quizId,
+    createdBy: userId
+  });
+
+  if (!quiz) {
+    throw new Error('Quiz not found or you are not the owner');
+  }
+
+  // Delete the quiz
+  const deletionResult = await Quiz.deleteOne({ _id: quizId });
+  
+  if (deletionResult.deletedCount === 0) {
+    // This shouldn't happen since we just found the quiz, but handle it anyway
+    throw new Error('Failed to delete quiz');
+  }
+
+  return deletionResult;
+};
+
 
 const publishQuizById = async (quizId, userId, publish, approvalStatus) => {
   try {
@@ -269,6 +290,7 @@ module.exports = {
   startQuiz,
   submitAnswer,
   getAllQuiz,
+  deleteQuiz,
   publishQuizById,
   refreshQuestion
 };

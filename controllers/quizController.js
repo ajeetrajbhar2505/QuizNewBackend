@@ -8,7 +8,7 @@ const createQuiz = async (socket, data) => {
     socket.emit('quiz:create:success', { quiz });
     logger.info(`Quiz created by user ${socket.user._id}`);
   } catch (error) {
-    socket.emit('quiz:create:error', { error: error.message });
+    socket.emit('quiz:create:error', { error: error.message,prompt : data.prompt});
     logger.error(`Quiz creation error: ${error.message}`);
   }
 };
@@ -19,7 +19,7 @@ const refreshQuestion = async (socket, quizId,questionIndex) => {
     socket.emit('quiz:refreshQuestion:success', { quiz });
     logger.info(`Quiz created by user ${socket.user._id}`);
   } catch (error) {
-    socket.emit('quiz:create:error', { error: error.message });
+    socket.emit('quiz:refreshQuestion:error', { error: error.message });
     logger.error(`Quiz creation error: ${error.message}`);
   }
 };
@@ -28,9 +28,9 @@ const getAllQuiz = async (socket) => {
   try {
     const quizes = await quizService.getAllQuiz(socket.user._id);
     socket.emit('quiz:all:success', { quizes });
-    logger.info(`Quiz created by user ${socket.user._id}`);
+    logger.info(`Quiz all by user ${socket.user._id}`);
   } catch (error) {
-    socket.emit('quiz:create:error', { error: error.message });
+    socket.emit('quiz:all:error', { error: error.message });
     logger.error(`Quiz creation error: ${error.message}`);
   }
 };
@@ -46,12 +46,22 @@ const getQuiz = async (socket, quizId) => {
   }
 };
 
+const deleteQuiz = async (socket, quizId) => {
+  try {
+    const quiz = await quizService.deleteQuiz(quizId, socket.user._id);
+    socket.emit('quiz:delete:success', { quiz });
+  } catch (error) {
+    socket.emit('quiz:delete:error', { error: error.message });
+    logger.error(`Get quiz error: ${error.message}`);
+  }
+};
+
 const publish = async (socket, quizId, publish, approvalStatus) => {
   try {
     const quiz = await quizService.publishQuizById(quizId, socket.user._id, publish, approvalStatus);
     socket.emit('quiz:publish:success', { quiz });
   } catch (error) {
-    socket.emit('quiz:get:error', { error: error.message });
+    socket.emit('quiz:publish:error', { error: error.message });
     logger.error(`Get quiz error: ${error.message}`);
   }
 };
@@ -90,5 +100,6 @@ module.exports = {
   submitAnswer,
   getAllQuiz,
   publish,
+  deleteQuiz,
   refreshQuestion
 };
