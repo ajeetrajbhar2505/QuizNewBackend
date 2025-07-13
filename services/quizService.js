@@ -6,14 +6,39 @@ const { getIO } = require('../config/socket');
 const AimlQuizService = require('./openai.service');
 
 const createQuiz = async (data, userId) => {
-  const quizData = await AimlQuizService.generateQuiz(data.prompt);
-  const quiz = await Quiz.create({
-    ...quizData,
-    createdBy: userId,
-    source: 'openai'
-  });
-  return quiz;
+  const geminiResponse = await AimlQuizService.generateQuiz(data.prompt);
+  const quizDoc = transformGeminiResponseToQuiz(geminiResponse, userId);
+  const newQuiz = await Quiz.create(quizDoc);
+  return newQuiz;
 };
+
+
+const getAllQuiz = async (userId) => {
+  try {
+    if (!userId) {
+      throw new Error('User ID is required');
+    }
+
+    const quizzes = await Quiz.find(
+      { createdBy: userId },
+      { 
+        difficulty: 1,
+        title: 1,
+        totalQuestions: 1,
+        category: 1,
+        description : 1,
+        isPublic: 1,
+        _id: 1
+      }
+    ).lean().exec();
+
+    return quizzes
+  } catch (error) {
+    console.error('Error fetching quizzes:', error);
+    throw new Error('Failed to fetch quizzes: ' + error.message);
+  }
+};
+
 
 const getQuizById = async (quizId) => {
   const quiz = await Quiz.findById(quizId).populate('createdBy', 'name avatar');
@@ -21,6 +46,36 @@ const getQuizById = async (quizId) => {
     throw new Error('Quiz not found');
   }
   return quiz;
+};
+
+
+const publishQuizById = async (quizId, userId) => {
+  try {
+    const quiz = await Quiz.findOne({
+      _id: quizId,
+      createdBy: userId
+    });
+
+    if (!quiz) {
+      throw new Error('Quiz not found or you are not the owner');
+    }
+
+    const updatedQuiz = await Quiz.findByIdAndUpdate(
+      quizId,
+      { 
+        $set: { 
+          isPublic: true,
+          updatedAt: new Date() 
+        } 
+      },
+      { new: true } 
+    );
+
+    return updatedQuiz;
+  } catch (error) {
+    console.error('Error publishing quiz:', error);
+    throw new Error(error.message || 'Failed to publish quiz');
+  }
 };
 
 const startQuiz = async (quizId, userId) => {
@@ -107,9 +162,53 @@ const updateUserStats = async (userId, isCorrect) => {
   return stats;
 };
 
+function transformGeminiResponseToQuiz(geminiResponse, userId) {
+  // Transform each question to match your schema
+  const transformedQuestions = geminiResponse.questions.map(question => {
+    // Convert options object to array while preserving order
+    const optionsArray = [
+      question.options.a,
+      question.options.b,
+      question.options.c,
+      question.options.d
+    ];
+
+    return {
+      question: question.questionText,
+      options: optionsArray,
+      correctAnswer: optionsArray[['a','b','c','d'].indexOf(question.correctAnswer)],
+      explanation: question.explanation,
+      points: question.points || 10 
+    };
+  });
+
+  // Create the quiz document
+  const quizDoc = {
+    title: geminiResponse.title,
+    description: geminiResponse.description,
+    category: geminiResponse.category,
+    difficulty: geminiResponse.title.split(' ')[0].toLowerCase(),
+    questions: transformedQuestions,
+    createdBy: userId,
+    isPublic: true,
+    createdAt: new Date(),
+    updatedAt: new Date()
+  };
+
+  // Validate difficulty
+  if (!['easy', 'medium', 'hard'].includes(quizDoc.difficulty)) {
+    quizDoc.difficulty = 'medium';
+  }
+
+  return quizDoc;
+}
+
+
 module.exports = {
   createQuiz,
   getQuizById,
   startQuiz,
   submitAnswer,
+  getAllQuiz,
+  publishQuizById
 };

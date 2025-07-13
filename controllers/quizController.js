@@ -13,10 +13,32 @@ const createQuiz = async (socket, data) => {
   }
 };
 
+const getAllQuiz = async (socket) => {
+  try {
+    const quizes = await quizService.getAllQuiz(socket.user._id);
+    socket.emit('quiz:all:success', { quizes });
+    logger.info(`Quiz created by user ${socket.user._id}`);
+  } catch (error) {
+    socket.emit('quiz:create:error', { error: error.message });
+    logger.error(`Quiz creation error: ${error.message}`);
+  }
+};
+
+
 const getQuiz = async (socket, quizId) => {
   try {
     const quiz = await quizService.getQuizById(quizId);
     socket.emit('quiz:get:success', { quiz });
+  } catch (error) {
+    socket.emit('quiz:get:error', { error: error.message });
+    logger.error(`Get quiz error: ${error.message}`);
+  }
+};
+
+const publish = async (socket, quizId) => {
+  try {
+    const quiz = await quizService.publishQuizById(quizId);
+    socket.emit('quiz:publish:success', { quiz });
   } catch (error) {
     socket.emit('quiz:get:error', { error: error.message });
     logger.error(`Get quiz error: ${error.message}`);
@@ -55,4 +77,6 @@ module.exports = {
   getQuiz,
   startQuiz,
   submitAnswer,
+  getAllQuiz,
+  publish
 };

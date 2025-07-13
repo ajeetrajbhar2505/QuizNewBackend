@@ -2,236 +2,248 @@ const { model } = require('../config/openai.config');
 const QUESTION_CACHE = new Map();
 
 class AIService {
-  static async generateQuiz(userPrompt, options = {}) {
-    // Step 1: Content safety check
-    await this._checkContentSafety(userPrompt);
-
-    // Step 2: Parse user prompt to extract topic and requirements
-    const { topic, questionCount, difficulty } = this._parseUserPrompt(userPrompt, options);
-    
-    // Step 3: Generate questions one by one
-    const questions = await this._generateQuestions(topic, questionCount, difficulty);
-
-    return {
-      title: `${difficulty} ${topic} Quiz`,
-      description: `A ${difficulty} quiz with ${questionCount} questions about ${topic}`,
-      questions,
-      source: 'gemini'
-    };
-  }
-
   /**
-   * Content safety check
+   * Generates a quiz from a user prompt (returns raw Gemini response)
+   * @param {string} userPrompt - The user's quiz request 
+   * @param {object} options - Generation options
+   * @returns {Promise<object>} Raw Gemini response with quiz data
    */
-  static async _checkContentSafety(prompt) {
-    const safetyPrompt = `Analyze this prompt for offensive or adult content: "${prompt}". 
-    Respond ONLY with "SAFE" or "UNSAFE".`;
-
+  static async generateQuiz(userPrompt, options = {}) {
     try {
-      const result = await model.generateContent(safetyPrompt);
-      const response = await result.response;
-      const text = response.text().trim();
+      // 1. Validate and parse input
+      if (!userPrompt || typeof userPrompt !== 'string') {
+        throw new Error('Prompt must be a non-empty string');
+      }
 
-      if (text === "UNSAFE") {
-        throw new Error("Content violates safety guidelines");
-      }
-      if (text !== "SAFE") {
-        throw new Error("Unable to verify content safety");
-      }
+      await this._checkContentSafety(userPrompt);
+
+      // 2. Extract requirements from prompt
+      const { topic, questionCount, difficulty } = this._parseUserPrompt(userPrompt, options);
+
+      // 3. Generate metadata in parallel
+      const [category, description] = await Promise.all([
+        this._determineCategoryWithAI(topic),
+        this._generateQuizDescription(topic, difficulty, questionCount)
+      ]);
+
+      // 4. Generate questions with timing
+      const { questions, totalTime } = await this._generateQuestionsWithTiming(
+        topic,
+        questionCount,
+        difficulty
+      );
+
+      // 5. Return raw Gemini response format
+      return {
+        title: this._generateQuizTitle(topic, difficulty),
+        topic,
+        description,
+        category,
+        difficulty,
+        totalQuestions: questionCount,
+        estimatedTime: totalTime,
+        source: 'gemini',
+        createdAt: new Date().toISOString(),
+        questions: questions.map(q => ({
+          id: this._generateQuestionId(q.questionText),
+          questionText: q.questionText,
+          options: q.options,
+          correctAnswer: q.correctAnswer,
+          explanation: q.explanation,
+          points: q.points || 10,
+          timeLimit: this._calculateTimePerQuestion(difficulty)
+        }))
+      };
+
     } catch (error) {
-      console.error("Safety check failed:", error.message);
-      throw new Error("This content cannot be processed due to safety concerns");
+      console.error('Quiz generation failed:', error);
+      throw new Error(`Quiz generation failed: ${error.message}`);
     }
   }
 
+  /* PRIVATE HELPER METHODS */
+
   /**
-   * Parse user prompt to extract requirements
+   * Parses user prompt into structured data
    */
   static _parseUserPrompt(userPrompt, options = {}) {
-    // Ensure userPrompt is a string
-    const promptString = typeof userPrompt === 'string' ? userPrompt : '';
-    
-    // Default values
+    const promptString = String(userPrompt || '').trim();
+
     const defaults = {
-        questionCount: 5,
-        difficulty: 'medium',
-        topic: 'general knowledge'
+      questionCount: Math.min(Math.max(parseInt(options.questionCount) || 5, 1), 20),
+      difficulty: ['easy', 'medium', 'hard'].includes(options.difficulty)
+        ? options.difficulty
+        : 'medium',
+      topic: 'general knowledge'
     };
 
-    // Initialize with defaults
-    let parsed = {
-        topic: userPrompt || defaults.topic,
-        questionCount: defaults.questionCount,
-        difficulty: defaults.difficulty
-    };
+    const parsed = { ...defaults };
 
-    // Override with options if provided
-    if (typeof options.questionCount === 'number') {
-        parsed.questionCount = Math.min(options.questionCount, 20); // Cap at 20 questions
+    if (!promptString) return parsed;
+
+    // Enhanced natural language parsing
+    const countMatch = promptString.match(/(?:generate|create|make)\s*(\d+)\s*(?:questions|items|q)/i)
+      || promptString.match(/(\d+)\s*questions?/i);
+    if (countMatch) parsed.questionCount = Math.min(parseInt(countMatch[1]), 20);
+
+    const difficultyMatch = promptString.match(/\b(easy|medium|hard|beginner|intermediate|advanced)\b/i);
+    if (difficultyMatch) {
+      const level = difficultyMatch[1].toLowerCase();
+      parsed.difficulty =
+        level === 'beginner' ? 'easy' :
+          level === 'intermediate' ? 'medium' :
+            level === 'advanced' ? 'hard' : level;
     }
-    if (['easy', 'medium', 'hard'].includes(options.difficulty)) {
-        parsed.difficulty = options.difficulty;
-    }
 
-    // Only try to parse from prompt if it's a non-empty string
-    if (promptString.trim().length > 0) {
-        // Try to extract question count
-        const countMatch = promptString.match(/(\d+)\s*questions?/i);
-        if (countMatch) {
-            parsed.questionCount = Math.min(parseInt(countMatch[1]), 20);
-        }
+    const topicMatch = promptString.match(/(?:about|on|regarding)\s*([^.?!]+)/i)
+      || [null, promptString];
+    if (topicMatch[1]) {
+      let topic = topicMatch[1]
+        .replace(/(?:generate|create|make)\s*\d*\s*(?:questions|items|q)/gi, '')
+        .replace(/\b(easy|medium|hard|beginner|intermediate|advanced)\b/gi, '')
+        .replace(/\b(?:quiz|test|questions?)\b/gi, '')
+        .trim();
 
-        // Try to extract difficulty
-        const difficultyMatch = promptString.match(/(easy|medium|hard)/i);
-        if (difficultyMatch) {
-            parsed.difficulty = difficultyMatch[1].toLowerCase();
-        }
-
-        // Extract topic - remove count and difficulty matches from the prompt
-        let topic = promptString
-            .replace(/(\d+)\s*questions?/i, '')
-            .replace(/(easy|medium|hard)/i, '')
-            .trim();
-
-        if (topic.length > 0) {
-            parsed.topic = topic;
-        }
+      parsed.topic = topic || defaults.topic;
     }
 
     return parsed;
-}
+  }
 
   /**
-   * Generate all questions
+   * Generates questions with calculated timing
    */
-  static async _generateQuestions(topic, count, difficulty) {
+  static async _generateQuestionsWithTiming(topic, count, difficulty) {
     const questions = [];
-    
+    let totalTime = 0;
+    const timePerQuestion = this._calculateTimePerQuestion(difficulty);
+
     for (let i = 0; i < count; i++) {
       try {
         if (i > 0) await this._delay(1000); // Rate limiting
-        
+
         const question = await this._generateSingleQuestion(
           i + 1,
           difficulty,
           topic
         );
+
         questions.push(question);
+        totalTime += timePerQuestion;
       } catch (error) {
         console.error(`Question ${i + 1} failed:`, error.message);
         questions.push(this._createFallbackQuestion(i + 1, topic));
+        totalTime += timePerQuestion;
       }
     }
 
-    return questions;
+    return { questions, totalTime };
   }
 
   /**
-   * Generate a single question with improved prompt
+   * Generates a unique ID for each question
    */
-  static async _generateSingleQuestion(questionNum, difficulty, topic, retries = 3) {
-    const cacheKey = `${topic}-${difficulty}-${questionNum}`;
-    
-    if (QUESTION_CACHE.has(cacheKey)) {
-      return QUESTION_CACHE.get(cacheKey);
-    }
-
-    try {
-      const prompt = this._buildQuestionPrompt(questionNum, difficulty, topic);
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const text = response.text();
-
-      if (!text) throw new Error("No content received");
-
-      const question = this._parseQuestionResponse(text, questionNum);
-      QUESTION_CACHE.set(cacheKey, { ...question, points: 1 });
-      return { ...question, points: 1 };
-
-    } catch (error) {
-      if (retries > 0) {
-        await this._delay(2000);
-        return this._generateSingleQuestion(questionNum, difficulty, topic, retries - 1);
-      }
-      throw error;
-    }
+  static _generateQuestionId(questionText) {
+    return require('crypto')
+      .createHash('md5')
+      .update(questionText)
+      .digest('hex')
+      .substring(0, 8);
   }
 
   /**
-   * Build optimized prompt for question generation
+   * Calculates time per question based on difficulty
    */
-  static _buildQuestionPrompt(questionNum, difficulty, topic) {
-    return `Generate quiz question ${questionNum} about ${topic} with these specifications:
-    
-    Difficulty: ${difficulty}
-    Requirements:
-    1. Question should be clear and unambiguous
-    2. Provide 4 answer options (a, b, c, d)
-    3. Mark the correct answer
-    4. Include a brief explanation (20-30 words)
-    5. Avoid trivial or overly complex questions
-    6. Format the response as valid JSON
-    
-    Example:
+  static _calculateTimePerQuestion(difficulty) {
+    const timing = { easy: 30, medium: 45, hard: 60 };
+    return timing[difficulty] || 45;
+  }
+
+  /**
+   * Generates an engaging quiz description
+   */
+  static async _generateQuizDescription(topic, difficulty, questionCount) {
+    const prompt = `Generate a concise 1-2 sentence description for a ${difficulty} quiz about ${topic} with ${questionCount} questions. Make it engaging.`;
+    const result = await model.generateContent(prompt);
+    return (await result.response).text().trim();
+  }
+
+  /**
+   * Generates a properly formatted quiz title
+   */
+  static _generateQuizTitle(topic, difficulty) {
+    return `${topic.split(' ')
+      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(' ')} ${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)} Quiz`;
+  }
+
+  /**
+   * Checks prompt for inappropriate content
+   */
+  static async _checkContentSafety(prompt) {
+    const result = await model.generateContent(`Analyze this prompt: "${prompt}". Respond ONLY with "SAFE" or "UNSAFE".`);
+    const response = (await result.response).text().trim();
+    if (response !== "SAFE") throw new Error("Content violates guidelines");
+  }
+
+  /**
+   * Determines the most relevant category
+   */
+  static async _determineCategoryWithAI(topic) {
+    const result = await model.generateContent(
+      `Categorize "${topic}" as one of: Programming, Science, History, Geography, Sports, Entertainment, Art, Mathematics, or General. Respond with exactly one word.`
+    );
+    const category = (await result.response).text().trim();
+    return ['Programming', 'Science', 'History', 'Geography', 'Sports', 'Entertainment', 'Art', 'Mathematics'].includes(category)
+      ? category
+      : 'General';
+  }
+
+  /**
+   * Generates a single quiz question
+   */
+  static async _generateSingleQuestion(index, difficulty, topic) {
+    const cacheKey = `${topic}-${difficulty}-${index}`;
+    if (QUESTION_CACHE.has(cacheKey)) return QUESTION_CACHE.get(cacheKey);
+
+    const prompt = `Generate a ${difficulty} difficulty quiz question about ${topic} with these requirements:
+    - Clear and concise question text
+    - 4 distinct options labeled a, b, c, d
+    - One correct answer (specify the letter)
+    - Brief explanation (20-30 words)
+    Format as valid JSON like this example:
     {
       "questionText": "What is the capital of France?",
-      "options": {
-        "a": "London",
-        "b": "Berlin",
-        "c": "Paris",
-        "d": "Madrid"
-      },
+      "options": { "a": "London", "b": "Berlin", "c": "Paris", "d": "Madrid" },
       "correctAnswer": "c",
-      "explanation": "Paris has been the capital of France since the 5th century."
-    }
-    
-    Now generate a ${difficulty} question about ${topic}:`;
-  }
+      "explanation": "Paris has been France's capital since 508 AD."
+    }`;
 
-  /**
-   * Parse the API response to extract question
-   */
-  static _parseQuestionResponse(text, questionNum) {
     try {
-      // Clean the response and extract JSON
-      const cleaned = text.replace(/```json|```/g, '').trim();
-      const question = JSON.parse(cleaned);
-      this._validateQuestion(question, questionNum);
-      return question;
+      const result = await model.generateContent(prompt);
+      const text = (await result.response).text();
+      const jsonText = text.replace(/```json|```/g, '').trim();
+      const question = JSON.parse(jsonText);
+
+      // Validate question structure
+      if (!question.questionText || !question.options || !question.correctAnswer) {
+        throw new Error('Invalid question format from AI');
+      }
+
+      QUESTION_CACHE.set(cacheKey, { ...question, points: 10 });
+      return { ...question, points: 10 };
     } catch (error) {
-      throw new Error(`Failed to parse question: ${error.message}`);
+      console.error('Question generation failed:', error);
+      return this._createFallbackQuestion(index, topic);
     }
   }
 
   /**
-   * Enhanced question validation
+   * Creates a fallback question if generation fails
    */
-  static _validateQuestion(question, questionNum) {
-    const errors = [];
-    
-    if (!question.questionText) errors.push("Missing questionText");
-    if (!question.options || Object.keys(question.options).length !== 4) {
-      errors.push("Need exactly 4 options (a, b, c, d)");
-    }
-    if (!question.correctAnswer || !['a','b','c','d'].includes(question.correctAnswer)) {
-      errors.push("Invalid correctAnswer (must be a, b, c, or d)");
-    }
-    if (!question.explanation || question.explanation.split(' ').length < 5) {
-      errors.push("Explanation too short");
-    }
-
-    if (errors.length > 0) {
-      throw new Error(`Invalid question ${questionNum}: ${errors.join(', ')}`);
-    }
-  }
-
-  static _delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
   static _createFallbackQuestion(index, topic) {
     return {
-      questionText: `What is an important aspect of ${topic}? (Fallback Q${index})`,
+      questionText: `What is an important aspect of ${topic}? (Question ${index})`,
       options: {
         a: "Option A",
         b: "Option B",
@@ -240,8 +252,15 @@ class AIService {
       },
       correctAnswer: "b",
       explanation: "This is a placeholder question.",
-      points: 1
+      points: 10
     };
+  }
+
+  /**
+   * Adds delay between API calls
+   */
+  static _delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 }
 
