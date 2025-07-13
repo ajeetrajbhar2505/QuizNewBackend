@@ -45,6 +45,7 @@ const getAllQuiz = async (userId) => {
         category: 1,
         description: 1,
         isPublic: 1,
+        estimatedTime:1,
         approvalStatus:1,
         _id: 1
       }

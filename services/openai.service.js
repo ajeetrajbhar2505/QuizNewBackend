@@ -19,7 +19,7 @@ class AIService {
       await this._checkContentSafety(userPrompt);
 
       // 2. Extract requirements from prompt
-      const { topic, questionCount, difficulty } = this._parseUserPrompt(userPrompt, options);
+      const { topic, questionCount, difficulty } = await this._parseUserPrompt(userPrompt, options);
 
       // 3. Generate metadata in parallel
       const [category, description] = await Promise.all([
@@ -67,7 +67,7 @@ class AIService {
   /**
    * Parses user prompt into structured data
    */
-  static _parseUserPrompt(userPrompt, options = {}) {
+ static async _parseUserPrompt(userPrompt, options = {}) {
     const promptString = String(userPrompt || '').trim();
 
     const defaults = {
@@ -96,18 +96,22 @@ class AIService {
             level === 'advanced' ? 'hard' : level;
     }
 
-    const topicMatch = promptString.match(/(?:about|on|regarding)\s*([^.?!]+)/i)
-      || [null, promptString];
-    if (topicMatch[1]) {
-      let topic = topicMatch[1]
-        .replace(/(?:generate|create|make)\s*\d*\s*(?:questions|items|q)/gi, '')
-        .replace(/\b(easy|medium|hard|beginner|intermediate|advanced)\b/gi, '')
-        .replace(/\b(?:quiz|test|questions?)\b/gi, '')
-        .trim();
+    const refinementPrompt = `
+      Transform this into a proper quiz title following these rules:
+      1. 3-8 words maximum
+      2. Title case formatting
+      3. Clear and specific to the topic
+      4. Remove any questions marks or informal language
+      5. Make it engaging for learners
+      6. Clear total count related words
+      Input: "${userPrompt}"
+      Proper Quiz Title: 
+    `;
 
-      parsed.topic = topic || defaults.topic;
-    }
-
+    const result = await model.generateContent(refinementPrompt);
+    const response = await result.response;
+    const topic = response.text();
+    parsed.topic = topic || defaults.topic
     return parsed;
   }
 
@@ -173,16 +177,14 @@ class AIService {
    * Generates a properly formatted quiz title
    */
   static _generateQuizTitle(topic, difficulty) {
-    return `${topic.split(' ')
-      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(' ')} ${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)} Quiz`;
+    return topic + ' - ' + difficulty
   }
 
   /**
    * Checks prompt for inappropriate content
    */
   static async _checkContentSafety(prompt) {
-    const result = await model.generateContent(`Analyze this prompt: "${prompt}". Respond ONLY with "SAFE" or "UNSAFE".`);
+    const result = await model.generateContent(`Analyze this prompt: "${prompt} as one of: Programming, Science, History, Geography, Sports, Entertainment, Art, Mathematics, or General. Respond with exactly one word.". Respond ONLY with "SAFE" or "UNSAFE".`);
     const response = (await result.response).text().trim();
     if (response !== "SAFE") throw new Error("Content violates guidelines");
   }
@@ -264,7 +266,7 @@ class AIService {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
- 
+
   static async refreshQuestion(quizId, userId, questionIndex) {
     try {
       // 1. Get the original quiz to maintain context
@@ -287,7 +289,7 @@ class AIService {
 
       // 4. Parse and validate the response
       const newQuestion = this._parseQuestionResponse(text);
-      
+
       // 5. Transform to database format
       const transformedQuestion = {
         question: newQuestion.questionText,
@@ -314,7 +316,7 @@ class AIService {
   }
 
 
-   static _buildRefreshPrompt(topic, difficulty, originalQuestion) {
+  static _buildRefreshPrompt(topic, difficulty, originalQuestion) {
     return `Generate a new ${difficulty} difficulty quiz question about ${topic} to replace this existing question:
     
     Original Question: "${originalQuestion.question}"
@@ -336,14 +338,14 @@ class AIService {
     }`;
   }
 
-   static _parseQuestionResponse(text) {
+  static _parseQuestionResponse(text) {
     try {
       const cleaned = text.replace(/```json|```/g, '').trim();
       const question = JSON.parse(cleaned);
       if (!question.questionText || !question.options || !question.correctAnswer) {
         throw new Error('Invalid question format from AI');
       }
-      
+
       return question;
     } catch (error) {
       console.error('Failed to parse question:', error);
