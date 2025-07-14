@@ -264,7 +264,7 @@ function transformGeminiResponseToQuiz(geminiResponse, userId) {
     source: geminiResponse.source,
     totalQuestions: geminiResponse.totalQuestions,
     createdBy: userId,
-    isPublic: true,
+    isPublic: false,
     createdAt: new Date(),
     updatedAt: new Date()
   };
