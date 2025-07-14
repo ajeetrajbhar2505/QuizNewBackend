@@ -243,7 +243,7 @@ class AIService {
    * Checks prompt for inappropriate content
    */
   static async _checkContentSafety(prompt) {
-    const result = await model.generateContent(`Analyze this prompt: "${prompt} as one of: Programming, Science, History, Geography, Sports, Entertainment, Art, Mathematics, or General. Respond ONLY with "SAFE" or "UNSAFE".`);
+    const result = await model.generateContent(`Analyze this prompt: "${prompt} as one of: Programming, Science, History, Geography, Sports, Entertainment, Art, Mathematics, or General Other Study Re;ated. Respond ONLY with "SAFE" or "UNSAFE".`);
     const response = (await result.response).text().trim();
     if (response !== "SAFE") throw new Error("Content violates guidelines");
   }
