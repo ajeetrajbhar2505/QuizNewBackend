@@ -27,8 +27,8 @@ class AIService {
         this._generateQuizDescription(topic, difficulty, questionCount)
       ]);
 
-      // 4. Generate questions with timing
-      const { questions, totalTime } = await this._generateQuestionsWithTiming(
+      // 4. Generate all questions in a single batch
+      const { questions, totalTime } = await this._generateAllQuestions(
         topic,
         questionCount,
         difficulty
@@ -45,8 +45,8 @@ class AIService {
         estimatedTime: totalTime,
         source: 'gemini',
         createdAt: new Date().toISOString(),
-        questions: questions.map(q => ({
-          id: this._generateQuestionId(q.questionText),
+        questions: questions.map((q, index) => ({
+          id: this._generateQuestionId(q.questionText + index),
           questionText: q.questionText,
           options: q.options,
           correctAnswer: q.correctAnswer,
@@ -67,7 +67,7 @@ class AIService {
   /**
    * Parses user prompt into structured data
    */
- static async _parseUserPrompt(userPrompt, options = {}) {
+  static async _parseUserPrompt(userPrompt, options = {}) {
     const promptString = String(userPrompt || '').trim();
 
     const defaults = {
@@ -116,33 +116,92 @@ class AIService {
   }
 
   /**
-   * Generates questions with calculated timing
+   * Generates all questions in a single batch request
    */
-  static async _generateQuestionsWithTiming(topic, count, difficulty) {
-    const questions = [];
-    let totalTime = 0;
-    const timePerQuestion = this._calculateTimePerQuestion(difficulty);
+  static async _generateAllQuestions(topic, count, difficulty) {
+    try {
+      const prompt = this._buildBatchQuestionPrompt(topic, count, difficulty);
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const text = response.text();
+      
+      // Parse the response
+      const questions = this._parseBatchQuestionsResponse(text, count);
+      
+      // Calculate total time
+      const timePerQuestion = this._calculateTimePerQuestion(difficulty);
+      const totalTime = timePerQuestion * count;
 
-    for (let i = 0; i < count; i++) {
-      try {
-        if (i > 0) await this._delay(1000); // Rate limiting
-
-        const question = await this._generateSingleQuestion(
-          i + 1,
-          difficulty,
-          topic
-        );
-
-        questions.push(question);
-        totalTime += timePerQuestion;
-      } catch (error) {
-        console.error(`Question ${i + 1} failed:`, error.message);
-        questions.push(this._createFallbackQuestion(i + 1, topic));
-        totalTime += timePerQuestion;
-      }
+      return { questions, totalTime };
+    } catch (error) {
+      console.error('Batch question generation failed:', error);
+      // Fallback to individual generation if batch fails
+      return this._generateQuestionsWithTiming(topic, count, difficulty);
     }
+  }
 
-    return { questions, totalTime };
+  /**
+   * Builds the prompt for batch question generation
+   */
+  static _buildBatchQuestionPrompt(topic, count, difficulty) {
+    return `Generate ${count} unique ${difficulty} difficulty quiz questions about ${topic} with these requirements for each:
+    - Clear and concise question text
+    - 4 distinct options labeled a, b, c, d
+    - One correct answer (specify the letter)
+    - Brief explanation (20-30 words)
+    - Questions should cover different aspects of ${topic}
+    - No duplicate or similar questions
+    
+    Format as a JSON array like this example:
+    [
+      {
+        "questionText": "What is the capital of France?",
+        "options": { "a": "London", "b": "Berlin", "c": "Paris", "d": "Madrid" },
+        "correctAnswer": "c",
+        "explanation": "Paris has been France's capital since 508 AD."
+      },
+      {
+        "questionText": "What river runs through Paris?",
+        "options": { "a": "Thames", "b": "Seine", "c": "Danube", "d": "Rhine" },
+        "correctAnswer": "b",
+        "explanation": "The Seine is the main river flowing through Paris."
+      }
+    ]
+    
+    Important: Return ONLY the JSON array, no additional text or markdown.`;
+  }
+
+  /**
+   * Parses the batch questions response
+   */
+  static _parseBatchQuestionsResponse(text, expectedCount) {
+    try {
+      const cleaned = text.replace(/```json|```/g, '').trim();
+      const questions = JSON.parse(cleaned);
+      
+      if (!Array.isArray(questions)) {
+        throw new Error('Expected an array of questions');
+      }
+      
+      if (questions.length !== expectedCount) {
+        throw new Error(`Expected ${expectedCount} questions, got ${questions.length}`);
+      }
+      
+      // Validate each question
+      questions.forEach((q, index) => {
+        if (!q.questionText || !q.options || !q.correctAnswer) {
+          throw new Error(`Question ${index + 1} is missing required fields`);
+        }
+        
+        // Add points to each question
+        q.points = 10;
+      });
+      
+      return questions;
+    } catch (error) {
+      console.error('Failed to parse batch questions:', error);
+      throw new Error('Invalid question format received from AI');
+    }
   }
 
   /**
@@ -184,7 +243,7 @@ class AIService {
    * Checks prompt for inappropriate content
    */
   static async _checkContentSafety(prompt) {
-    const result = await model.generateContent(`Analyze this prompt: "${prompt} as one of: Programming, Science, History, Geography, Sports, Entertainment, Art, Mathematics, or General. Respond with exactly one word.". Respond ONLY with "SAFE" or "UNSAFE".`);
+    const result = await model.generateContent(`Analyze this prompt: "${prompt} as one of: Programming, Science, History, Geography, Sports, Entertainment, Art, Mathematics, or General. Respond ONLY with "SAFE" or "UNSAFE".`);
     const response = (await result.response).text().trim();
     if (response !== "SAFE") throw new Error("Content violates guidelines");
   }
@@ -203,7 +262,37 @@ class AIService {
   }
 
   /**
-   * Generates a single quiz question
+   * Fallback method for individual question generation
+   */
+  static async _generateQuestionsWithTiming(topic, count, difficulty) {
+    const questions = [];
+    let totalTime = 0;
+    const timePerQuestion = this._calculateTimePerQuestion(difficulty);
+
+    for (let i = 0; i < count; i++) {
+      try {
+        if (i > 0) await this._delay(1000); // Rate limiting
+
+        const question = await this._generateSingleQuestion(
+          i + 1,
+          difficulty,
+          topic
+        );
+
+        questions.push(question);
+        totalTime += timePerQuestion;
+      } catch (error) {
+        console.error(`Question ${i + 1} failed:`, error.message);
+        questions.push(this._createFallbackQuestion(i + 1, topic));
+        totalTime += timePerQuestion;
+      }
+    }
+
+    return { questions, totalTime };
+  }
+
+  /**
+   * Generates a single quiz question (fallback method)
    */
   static async _generateSingleQuestion(index, difficulty, topic) {
     const cacheKey = `${topic}-${difficulty}-${index}`;
@@ -266,7 +355,6 @@ class AIService {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
-
   static async refreshQuestion(quizId, userId, questionIndex) {
     try {
       // 1. Get the original quiz to maintain context
@@ -315,7 +403,6 @@ class AIService {
     }
   }
 
-
   static _buildRefreshPrompt(topic, difficulty, originalQuestion) {
     return `Generate a new ${difficulty} difficulty quiz question about ${topic} to replace this existing question:
     
@@ -352,7 +439,6 @@ class AIService {
       throw new Error('Invalid question format received from AI');
     }
   }
-
 }
 
 module.exports = AIService;
