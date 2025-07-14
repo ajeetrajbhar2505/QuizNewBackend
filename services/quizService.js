@@ -65,7 +65,7 @@ const getPublishedQuiz = async (userId) => {
     }
 
     const quizzes = await Quiz.find(
-      { createdBy: userId, isPublic: true },
+      { isPublic: true },
       {
         difficulty: 1,
         title: 1,
