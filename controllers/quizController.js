@@ -24,6 +24,17 @@ const refreshQuestion = async (socket, quizId,questionIndex) => {
   }
 };
 
+const getPublishedQuiz = async (socket) => {
+  try {
+    const quizes = await quizService.getPublishedQuiz(socket.user._id);
+    socket.emit('quiz:published:success', { quizes });
+    logger.info(`Quiz all by user ${socket.user._id}`);
+  } catch (error) {
+    socket.emit('quiz:published:error', { error: error.message });
+    logger.error(`Quiz creation error: ${error.message}`);
+  }
+};
+
 const getAllQuiz = async (socket) => {
   try {
     const quizes = await quizService.getAllQuiz(socket.user._id);
@@ -34,6 +45,7 @@ const getAllQuiz = async (socket) => {
     logger.error(`Quiz creation error: ${error.message}`);
   }
 };
+
 
 
 const getQuiz = async (socket, quizId) => {
@@ -101,5 +113,6 @@ module.exports = {
   getAllQuiz,
   publish,
   deleteQuiz,
-  refreshQuestion
+  refreshQuestion,
+  getPublishedQuiz
 };

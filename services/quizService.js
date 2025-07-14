@@ -12,12 +12,12 @@ const createQuiz = async (data, userId) => {
   return newQuiz;
 };
 
-const refreshQuestion = async (userId,quizId,questionIndex) => {
-  const geminiResponse = await AimlQuizService.refreshQuestion(quizId,userId,questionIndex);
-   await Quiz.findByIdAndUpdate(
+const refreshQuestion = async (userId, quizId, questionIndex) => {
+  const geminiResponse = await AimlQuizService.refreshQuestion(quizId, userId, questionIndex);
+  await Quiz.findByIdAndUpdate(
     quizId,
-    { 
-      $set: { 
+    {
+      $set: {
         [`questions.${questionIndex}`]: geminiResponse,
         updatedAt: new Date()
       }
@@ -45,8 +45,8 @@ const getAllQuiz = async (userId) => {
         category: 1,
         description: 1,
         isPublic: 1,
-        estimatedTime:1,
-        approvalStatus:1,
+        estimatedTime: 1,
+        approvalStatus: 1,
         _id: 1
       }
     ).lean().exec();
@@ -57,6 +57,35 @@ const getAllQuiz = async (userId) => {
     throw new Error('Failed to fetch quizzes: ' + error.message);
   }
 };
+
+const getPublishedQuiz = async (userId) => {
+  try {
+    if (!userId) {
+      throw new Error('User ID is required');
+    }
+
+    const quizzes = await Quiz.find(
+      { createdBy: userId, isPublic: true },
+      {
+        difficulty: 1,
+        title: 1,
+        totalQuestions: 1,
+        category: 1,
+        description: 1,
+        isPublic: 1,
+        estimatedTime: 1,
+        approvalStatus: 1,
+        _id: 1
+      }
+    ).lean().exec();
+
+    return quizzes
+  } catch (error) {
+    console.error('Error fetching quizzes:', error);
+    throw new Error('Failed to fetch quizzes: ' + error.message);
+  }
+};
+
 
 
 const getQuizById = async (quizId) => {
@@ -79,7 +108,7 @@ const deleteQuiz = async (quizId, userId) => {
 
   // Delete the quiz
   const deletionResult = await Quiz.deleteOne({ _id: quizId });
-  
+
   if (deletionResult.deletedCount === 0) {
     // This shouldn't happen since we just found the quiz, but handle it anyway
     throw new Error('Failed to delete quiz');
@@ -293,5 +322,6 @@ module.exports = {
   getAllQuiz,
   deleteQuiz,
   publishQuizById,
-  refreshQuestion
+  refreshQuestion,
+  getPublishedQuiz
 };
