@@ -175,19 +175,19 @@ const verifyOtpAndLogin = async (email, otp, verificationToken, req) => {
 
     const stats = await UserStats.findOneAndUpdate(
       { user: user._id },
-      { 
+      {
         $set: { lastActive: new Date() },
-        $setOnInsert: { 
+        $setOnInsert: {
           streak: {
             current: 1,
             lastUpdated: new Date()
           }
         }
       },
-      { 
-        new: true, 
-        upsert: true, 
-        session 
+      {
+        new: true,
+        upsert: true,
+        session
       }
     );
 
@@ -236,23 +236,23 @@ const loginUser = async (email, password, req) => {
     user.markAsLoggedIn(sessionInfo);
     await user.save({ session });
 
- 
+
 
     const stats = await UserStats.findOneAndUpdate(
       { user: user._id },
-      { 
+      {
         $set: { lastActive: new Date() },
-        $setOnInsert: { 
+        $setOnInsert: {
           streak: {
             current: 1,
             lastUpdated: new Date()
           }
         }
       },
-      { 
-        new: true, 
-        upsert: true, 
-        session 
+      {
+        new: true,
+        upsert: true,
+        session
       }
     );
 
@@ -290,7 +290,7 @@ const generateGoogleAuthUrl = async () => {
   return await googleClient.generateAuthUrl({
     access_type: 'offline',
     scope: ['https://www.googleapis.com/auth/userinfo.profile', 'https://www.googleapis.com/auth/userinfo.email'],
-    prompt:'select_account'
+    prompt: 'select_account'
   });
 };
 
@@ -303,13 +303,16 @@ const handleGoogleCallback = async (code, req) => {
   session.startTransaction();
 
   try {
-    const { tokens } = await googleClient.getToken(code);
+    const { tokens } = await googleClient.getToken({ code, redirect_uri: process.env.GOOGLE_REDIRECT_URI });
     const ticket = await googleClient.verifyIdToken({
       idToken: tokens.id_token,
       audience: process.env.GOOGLE_CLIENT_ID,
     });
 
-    const { email, name, picture, sub: googleId } = ticket.getPayload();
+    const payload = ticket.getPayload();
+    if (!payload) throw new Error('Invalid Google token payload');
+
+    const { email, name, picture, sub: googleId } = payload;
     const defaultAvatar = 'https://quiznewbackend.onrender.com/profile.jpg';
     const avatar = picture?.startsWith('http') ? picture : defaultAvatar;
 
@@ -338,7 +341,7 @@ const handleGoogleCallback = async (code, req) => {
           {
             $addToSet: { loginHistory: sessionInfo },
             lastLoginAt: new Date(),
-            isLoggedIn : true
+            isLoggedIn: true
           },
           { new: true, yield: true, session }
         );
@@ -346,19 +349,19 @@ const handleGoogleCallback = async (code, req) => {
 
       const stats = await UserStats.findOneAndUpdate(
         { user: user._id },
-        { 
+        {
           $set: { lastActive: new Date() },
-          $setOnInsert: { 
+          $setOnInsert: {
             streak: {
               current: 1,
               lastUpdated: new Date()
             }
           }
         },
-        { 
-          new: true, 
-          upsert: true, 
-          session 
+        {
+          new: true,
+          upsert: true,
+          session
         }
       );
 
@@ -465,7 +468,7 @@ const handleFacebookCallback = async (code, req) => {
       const update = {
         $set: {
           lastLoginAt: new Date(),
-          isLoggedIn : true,
+          isLoggedIn: true,
           ...(!user.facebookId && { facebookId }),
           ...(!user.avatar?.includes('http') && { avatar })
         },
@@ -482,19 +485,19 @@ const handleFacebookCallback = async (code, req) => {
 
       const stats = await UserStats.findOneAndUpdate(
         { user: user._id },
-        { 
+        {
           $set: { lastActive: new Date() },
-          $setOnInsert: { 
+          $setOnInsert: {
             streak: {
               current: 1,
               lastUpdated: new Date()
             }
           }
         },
-        { 
-          new: true, 
-          upsert: true, 
-          session 
+        {
+          new: true,
+          upsert: true,
+          session
         }
       );
 
@@ -524,7 +527,7 @@ const handleFacebookCallback = async (code, req) => {
       await stats.save({ session });
     }
 
-    
+
     const token = generateToken(user);
     const userResponse = user.toObject();
 
