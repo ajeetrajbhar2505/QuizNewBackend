@@ -27,7 +27,7 @@ const refreshQuestion = async (socket, quizId,questionIndex) => {
 const getPublishedQuiz = async (socket) => {
   try {
     const quizes = await quizService.getPublishedQuiz(socket.user._id);
-    socket.emit('quiz:published:success', { quizes });
+    getIO().emit('quiz:published:success', { quizes });
     logger.info(`Quiz all by user ${socket.user._id}`);
   } catch (error) {
     socket.emit('quiz:published:error', { error: error.message });
@@ -38,7 +38,7 @@ const getPublishedQuiz = async (socket) => {
 const getAllQuiz = async (socket) => {
   try {
     const quizes = await quizService.getAllQuiz(socket.user._id);
-    socket.emit('quiz:all:success', { quizes });
+    getIO().emit('quiz:all:success', { quizes });
     logger.info(`Quiz all by user ${socket.user._id}`);
   } catch (error) {
     socket.emit('quiz:all:error', { error: error.message });
