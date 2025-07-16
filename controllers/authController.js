@@ -27,42 +27,41 @@ const login = async (socket, email) => {
   }
 };
 
-const verifyOtpAndLogin = async (socket, data) => {
+const verifyOtpAndLogin = async (socket, email, otp, verificationToken) => {
   try {
-    const { email, otp, verificationToken } = data
     const sessionInfo = {
       ipAddress: socket.handshake.address,
       userAgent: socket.handshake.headers['user-agent']
     };
-
+    
     const result = await authService.verifyOtpAndLogin(
-      email,
-      otp,
-      verificationToken,
+      email, 
+      otp, 
+      verificationToken, 
       sessionInfo
     );
-
+    
     socket.emit('auth:otp:verify:success', {
       token: result.token,
       user: result.user
     });
-
+    
     logger.info(`OTP verified and user logged in: ${email}`);
   } catch (error) {
-    socket.emit('auth:otp:verify:error', {
+    socket.emit('auth:otp:verify:error', { 
       message: error.message,
       email: email
     });
-
+    
     logger.error(`OTP verification failed for ${email}: ${error.message}`);
   }
 };
 
-const logout = async (socket, userId) => {
+const logout = async (socket,userId) => {
   try {
     if (userId) {
       await authService.logoutUser(userId);
-      socket.emit('auth:logout:success');
+      socket.emit('auth:logout:success'); 
       logger.info(`User logged out: ${userId}`);
     }
   } catch (error) {
