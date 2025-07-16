@@ -25,7 +25,7 @@ const initSocket = (server) => {
     socket.on('auth:google:callback', (code) => authController.googleCallback(socket, code));
     socket.on('auth:facebook:login', () => authController.facebookLogin(socket));
     socket.on('auth:facebook:callback', (code) => authController.facebookCallback(socket, code));
-    socket.on('auth:verify:loginOTP', (email, otp, verificationToken) => authController.verifyOtpAndLogin(socket, email, otp, verificationToken));
+    socket.on('auth:verify:loginOTP', (data) => authController.verifyOtpAndLogin(socket, data));
     socket.on('auth:otp:verify', (data) => authController.verifyOTP(socket, data));
     socket.on('auth:otp:send', (email) => authController.sendOTP(socket, email));
 
