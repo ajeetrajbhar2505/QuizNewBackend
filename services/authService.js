@@ -361,6 +361,7 @@ const handleGoogleCallback = async (code, req) => {
         {
           new: true,
           upsert: true,
+          yield: true,
           session
         }
       );
@@ -497,6 +498,7 @@ const handleFacebookCallback = async (code, req) => {
         {
           new: true,
           upsert: true,
+          yield: true,
           session
         }
       );
