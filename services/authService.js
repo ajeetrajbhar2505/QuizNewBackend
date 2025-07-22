@@ -471,6 +471,179 @@ const handleGoogleCallback = async (code, req) => {
   }
 };
 
+const handleFacebookCallback = async (code, req) => {
+  // 1. Input validation
+  if (!code || typeof code !== 'string') {
+    throw new Error('Invalid authorization code');
+  }
+
+  const session = await User.startSession();
+  session.startTransaction();
+
+  try {
+    // 2. Environment verification
+    const requiredEnvVars = ['FACEBOOK_APP_ID', 'FACEBOOK_APP_SECRET', 'FACEBOOK_REDIRECT_URI'];
+    for (const varName of requiredEnvVars) {
+      if (!process.env[varName]) {
+        throw new Error(`Missing required environment variable: ${varName}`);
+      }
+    }
+
+    // 3. Token exchange with timeout protection
+    const tokenExchangeStart = Date.now();
+    const tokenUrl = `https://graph.facebook.com/v19.0/oauth/access_token?` +
+      querystring.stringify({
+        client_id: process.env.FACEBOOK_APP_ID,
+        client_secret: process.env.FACEBOOK_APP_SECRET,
+        redirect_uri: process.env.FACEBOOK_REDIRECT_URI,
+        code: code
+      });
+
+    let tokenRes;
+    try {
+      tokenRes = await axios.get(tokenUrl, { timeout: 10000 }); // 10s timeout
+    } catch (error) {
+      if (error.code === 'ECONNABORTED') {
+        throw new Error('Facebook token request timed out');
+      }
+      throw error;
+    }
+
+    console.log(`Token exchange completed in ${Date.now() - tokenExchangeStart}ms`);
+
+    const tokenData = tokenRes.data;
+    if (!tokenData.access_token) {
+      throw new Error('Facebook token response missing access_token');
+    }
+
+    // 4. Profile request with enhanced fields
+    const profileUrl = `https://graph.facebook.com/me?` +
+      querystring.stringify({
+        fields: 'id,name,email,first_name,last_name,picture.width(500).height(500)',
+        access_token: tokenData.access_token
+      });
+
+    const profileRes = await axios.get(profileUrl, { timeout: 10000 });
+    const profileData = profileRes.data;
+
+    if (profileData.error) {
+      throw new Error(`Facebook API error: ${profileData.error.message}`);
+    }
+
+    // 5. Data processing with fallbacks
+    const { id: facebookId, name, email, first_name, last_name, picture } = profileData;
+    const sanitizedEmail = email ? email.trim().toLowerCase() : `${facebookId}@facebook.com`;
+    const defaultAvatar = 'https://quiznewbackend.onrender.com/profile.jpg';
+    const avatar = picture?.data?.url || defaultAvatar;
+
+    // 6. Session tracking
+    const sessionInfo = {
+      ip: req.ip || 'unknown',
+      userAgent: req.headers['user-agent'] || 'unknown',
+      loginTime: new Date(),
+      authProvider: 'facebook'
+    };
+
+    // 7. Atomic user upsert
+    let user = await User.findOneAndUpdate(
+      { $or: [{ email: sanitizedEmail }, { facebookId }] },
+      {
+        $setOnInsert: {
+          name: name || `${first_name} ${last_name}`.trim(),
+          email: sanitizedEmail,
+          facebookId,
+          avatar,
+          isVerified: true,
+          lastLoginAt: new Date()
+        },
+        $set: {
+          lastLoginAt: new Date(),
+          isLoggedIn: true,
+          ...(!email && { email: sanitizedEmail }) // Update if email was missing
+        },
+        $addToSet: {
+          loginHistory: sessionInfo
+        }
+      },
+      {
+        new: true,
+        upsert: true,
+        session
+      }
+    );
+
+    // 8. Stats handling (non-blocking)
+    try {
+      const stats = await UserStats.findOneAndUpdate(
+        { user: user._id },
+        {
+          $set: { lastActive: new Date() },
+          $setOnInsert: {
+            streak: { current: 1, lastUpdated: new Date() }
+          }
+        },
+        { upsert: true, new: true, session }
+      );
+      
+      stats.updateStreak();
+      await stats.save({ session });
+    } catch (statsError) {
+      console.warn('User stats update failed:', statsError);
+      // Continue even if stats fail
+    }
+
+    // 9. Successful auth
+    const token = generateToken(user);
+    const userResponse = user.toObject();
+
+    await session.commitTransaction();
+    session.endSession();
+
+    logger.info(`Facebook authentication successful`, {
+      userId: user._id,
+      email: sanitizedEmail,
+      authMethod: 'facebook'
+    });
+
+    return {
+      success: true,
+      token,
+      user: userResponse
+    };
+
+  } catch (error) {
+    // 10. Comprehensive error handling
+    await session.abortTransaction().catch(transactionError => {
+      console.error('Transaction abort failed:', transactionError);
+    });
+    session.endSession();
+
+    const errorContext = {
+      error: error.message,
+      errorType: error.constructor.name,
+      code: code ? `${code.substring(0, 2)}...${code.slice(-2)}` : 'none',
+      timestamp: new Date().toISOString(),
+      redirectUri: process.env.FACEBOOK_REDIRECT_URI,
+      headers: {
+        'user-agent': req.headers['user-agent'],
+        'x-forwarded-for': req.headers['x-forwarded-for']
+      }
+    };
+
+    logger.error('Facebook authentication failed', errorContext);
+
+    // User-friendly messages
+    let userMessage = 'Authentication failed. Please try again.';
+    if (error.message.includes('access_token')) {
+      userMessage = 'Facebook login expired. Please sign in again.';
+    } else if (error.message.includes('ECONN')) {
+      userMessage = 'Connection to Facebook failed. Please check your network.';
+    }
+
+    throw new Error(userMessage);
+  }
+};
+
 const sendOtp = async (email) => {
   const session = await User.startSession();
   session.startTransaction();
