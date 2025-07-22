@@ -304,7 +304,7 @@ const handleGoogleCallback = async (code, req) => {
 
   try {
     const codeReceivedTime = Date.now();
-    const { tokens } = await googleClient.getToken({ code, redirect_uri: process.env.GOOGLE_REDIRECT_URI });
+    const { tokens } = await googleClient.getToken({ code, redirect_uri: process.env.GOOGLE_REDIRECT_URL });
     console.log(`Code exchange took ${Date.now() - codeReceivedTime}ms`);
     const ticket = await googleClient.verifyIdToken({
       idToken: tokens.id_token,
@@ -418,7 +418,8 @@ const handleGoogleCallback = async (code, req) => {
       time: new Date().toISOString(),
       serverTimeOffset: new Date().getTimezoneOffset(),
       redirectUri: process.env.GOOGLE_REDIRECT_URI,
-      headers: req.headers
+      headers: req.headers,
+      req:req
     }
     console.log(customerror);
     logger.error(`Google auth failed`, customerror);
@@ -562,7 +563,8 @@ const handleFacebookCallback = async (code, req) => {
       code: code?.substring(0, 10) + '...',
       time: new Date().toISOString(),
       serverTimeOffset: new Date().getTimezoneOffset(),
-      redirectUri: process.env.GOOGLE_REDIRECT_URI,
+      redirectUri: process.env.FACEBOOK_REDIRECT_URI,
+      req:req,
       headers: req.headers
     }
     console.log(customerror);
