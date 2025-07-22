@@ -229,7 +229,7 @@ const loginUser = async (email, password, req) => {
 
     const sessionInfo = {
       ip: req.ip,
-      userAgent: req.headers['user-agent'] || '',
+      userAgent: req.headers['user-agent'] || 'unknown',
       loginTime: new Date()
     };
 
@@ -288,7 +288,7 @@ const logoutUser = async (userId) => {
 
 const generateGoogleAuthUrl = async () => {
   return await googleClient.generateAuthUrl({
-    access_type: 'offline',
+    access_type: 'online',
     scope: ['https://www.googleapis.com/auth/userinfo.profile', 'https://www.googleapis.com/auth/userinfo.email'],
     prompt: 'select_account'
   });
@@ -452,7 +452,7 @@ const handleGoogleCallback = async (code, req) => {
       serverTimeOffset: new Date().getTimezoneOffset(),
       redirectUri: process.env.GOOGLE_REDIRECT_URL,
       headers: {
-        'user-agent': req.headers['user-agent'],
+        'user-agent': req.headers['user-agent'] || 'unknown',
         'x-forwarded-for': req.headers['x-forwarded-for']
       }
     };
@@ -625,7 +625,6 @@ const handleFacebookCallback = async (code, req) => {
       timestamp: new Date().toISOString(),
       redirectUri: process.env.FACEBOOK_REDIRECT_URI,
       headers: {
-        'user-agent': req.headers['user-agent'],
         'x-forwarded-for': req.headers['x-forwarded-for']
       }
     };
@@ -755,7 +754,7 @@ const verifyOtp = async (email, otp, verificationToken, req) => {
     // Create session info
     const sessionInfo = {
       ip: req.ip,
-      userAgent: req.headers['user-agent'],
+      userAgent: req.headers['user-agent'] || 'unknown',
       loginTime: new Date()
     };
 
