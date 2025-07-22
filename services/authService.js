@@ -303,7 +303,9 @@ const handleGoogleCallback = async (code, req) => {
   session.startTransaction();
 
   try {
+    const codeReceivedTime = Date.now();
     const { tokens } = await googleClient.getToken({ code, redirect_uri: process.env.GOOGLE_REDIRECT_URI });
+    console.log(`Code exchange took ${Date.now() - codeReceivedTime}ms`);
     const ticket = await googleClient.verifyIdToken({
       idToken: tokens.id_token,
       audience: process.env.GOOGLE_CLIENT_ID,
@@ -410,7 +412,16 @@ const handleGoogleCallback = async (code, req) => {
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
-    logger.error(`Google callback error: ${error.message}`);
+    const customerror = {
+      error: error.message,
+      code: code?.substring(0, 10) + '...',
+      time: new Date().toISOString(),
+      serverTimeOffset: new Date().getTimezoneOffset(),
+      redirectUri: process.env.GOOGLE_REDIRECT_URI,
+      headers: req.headers
+    }
+    console.log(customerror);
+    logger.error(`Google auth failed`, customerror);
     throw new Error('Google authentication failed');
   }
 };
@@ -546,7 +557,16 @@ const handleFacebookCallback = async (code, req) => {
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
-    logger.error(`Facebook authentication failed: ${error.message}`);
+    const customerror = {
+      error: error.message,
+      code: code?.substring(0, 10) + '...',
+      time: new Date().toISOString(),
+      serverTimeOffset: new Date().getTimezoneOffset(),
+      redirectUri: process.env.GOOGLE_REDIRECT_URI,
+      headers: req.headers
+    }
+    console.log(customerror);
+    logger.error(`Facebook authentication failed`,customerror);
     throw new Error(`Facebook authentication failed: ${error.message}`);
   }
 };
