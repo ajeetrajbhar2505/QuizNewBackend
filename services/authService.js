@@ -30,6 +30,7 @@ const generatePKCE = () => {
     .replace(/=+$/, '');
   return { verifier, challenge };
 };
+let verifier;
 
 const googleClient = new OAuth2Client(
   process.env.GOOGLE_CLIENT_ID,
@@ -299,8 +300,7 @@ const logoutUser = async (userId) => {
 
 const generateGoogleAuthUrl = async (req) => {
   const { challenge,verifier } = generatePKCE();
-  req.session.oauthVerifier = verifier;
-  req.session.save();
+  verifier = verifier
 
   return await googleClient.generateAuthUrl({
     access_type: 'offline',
@@ -316,7 +316,7 @@ const generateFacebookAuthUrl = () => {
 };
 const handleGoogleCallback = async (code, req) => {
 
-  if (!req.session.oauthVerifier) {
+  if (!verifier) {
     throw new Error('Missing OAuth verifier - restart login flow');
   }
 
@@ -352,7 +352,7 @@ const handleGoogleCallback = async (code, req) => {
     const tokenOptions = {
       code,
       redirect_uri: process.env.GOOGLE_REDIRECT_URL,
-      code_verifier: req.session.oauthVerifier ,
+      code_verifier: verifier,
       client_id: process.env.GOOGLE_CLIENT_ID,
       client_secret: process.env.GOOGLE_CLIENT_SECRET
     };
@@ -388,9 +388,7 @@ const handleGoogleCallback = async (code, req) => {
       throw new Error('Invalid token payload - missing user information');
     }
 
-    delete req.session.oauthVerifier;
-    req.session.save();
-    
+
     // 4. Validate essential payload fields
     const requiredFields = ['email', 'name', 'sub'];
     for (const field of requiredFields) {
