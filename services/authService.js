@@ -289,7 +289,7 @@ const logoutUser = async (userId) => {
 const generateGoogleAuthUrl = async () => {
   return await googleClient.generateAuthUrl({
     access_type: 'online',
-    scope: ['https://www.googleapis.com/auth/userinfo.profile', 'https://www.googleapis.com/auth/userinfo.email'],
+    scope: ['profile', 'email'],
     prompt: 'consent'
   });
 };
@@ -322,13 +322,8 @@ const handleGoogleCallback = async (code, req) => {
     let tokens;
     try {
 
-      const tokenResponse = await googleClient.getToken({
-        code,
-        redirect_uri: process.env.GOOGLE_REDIRECT_URL,
-      });
-      tokens = tokenResponse.tokens;
-      console.log({tokens});
-      googleClient.setCredentials(tokens);
+      const { tokens } = await googleClient.getToken({ code });
+      tokens = tokens
 
     } catch (error) {
       if (error.message.includes('invalid_grant')) {
@@ -345,9 +340,9 @@ const handleGoogleCallback = async (code, req) => {
     // 3. Enhanced token verification
     const ticket = await googleClient.verifyIdToken({
       idToken: tokens.id_token,
-      audience: process.env.GOOGLE_CLIENT_ID,
+      audience: process.env.GOOGLE_CLIENT_ID
     });
-
+    
     const payload = ticket.getPayload();
     if (!payload) {
       throw new Error('Invalid token payload - missing user information');
