@@ -20,18 +20,6 @@ const transporter = nodemailer.createTransport({
   },
 });
 
-const generatePKCE = () => {
-  let verifier = crypto.randomBytes(32).toString('hex');
-  const challenge = crypto.createHash('sha256')
-    .update(verifier)
-    .digest('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
-  return { verifier, challenge };
-};
-let generatePKCEverifier;
-
 const googleClient = new OAuth2Client(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
@@ -241,7 +229,7 @@ const loginUser = async (email, password, req) => {
 
     const sessionInfo = {
       ip: req.ip,
-      userAgent: req.headers['user-agent'] || 'unknown',
+      userAgent: req.headers['user-agent'] || '',
       loginTime: new Date()
     };
 
@@ -298,181 +286,123 @@ const logoutUser = async (userId) => {
   await user.save();
 };
 
-const generateGoogleAuthUrl = async (req) => {
-  let { challenge,verifier } = generatePKCE();
-  generatePKCEverifier = verifier
-
+const generateGoogleAuthUrl = async () => {
   return await googleClient.generateAuthUrl({
     access_type: 'offline',
-    prompt: 'consent',
-    scope: ['profile', 'email'],
-    code_challenge: challenge,
-    code_challenge_method: 'S256'
+    scope: ['https://www.googleapis.com/auth/userinfo.profile', 'https://www.googleapis.com/auth/userinfo.email'],
+    prompt: 'select_account'
   });
 };
 
 const generateFacebookAuthUrl = () => {
   return `https://www.facebook.com/v19.0/dialog/oauth?client_id=${process.env.FACEBOOK_APP_ID}&redirect_uri=${encodeURIComponent(process.env.FACEBOOK_REDIRECT_URI)}&scope=email,public_profile&response_type=code&auth_type=rerequest`;
 };
+
 const handleGoogleCallback = async (code, req) => {
-
-  if (!generatePKCEverifier) {
-    throw new Error('Missing OAuth verifier - restart login flow');
-  }
-
-  // Validate input immediately
-  if (!code || typeof code !== 'string') {
-    throw new Error('Invalid authorization code');
-  }
-
   const session = await User.startSession();
   session.startTransaction();
 
   try {
-    // 1. Verify environment configuration
-    const requiredEnvVars = ['GOOGLE_REDIRECT_URL', 'GOOGLE_CLIENT_ID'];
-    for (const varName of requiredEnvVars) {
-      if (!process.env[varName]) {
-        throw new Error(`Missing required environment variable: ${varName}`);
-      }
-    }
-
-    const timeCheck = await axios.get('https://worldtimeapi.org/api/ip')
-    .then(res => Math.abs(Date.now() - new Date(res.data.unixtime * 1000)))
-    .catch(() => 0);
-
-  if (timeCheck > 30000) { // 30s threshold
-    throw new Error('System time out of sync with Google servers');
-  }
-
-
-    // 2. Add timeout protection for token exchange
-    const tokenExchangeStart = Date.now();
-
-    const tokenOptions = {
-      code,
-      redirect_uri: process.env.GOOGLE_REDIRECT_URL,
-      code_verifier: generatePKCEverifier,
-      client_id: process.env.GOOGLE_CLIENT_ID,
-      client_secret: process.env.GOOGLE_CLIENT_SECRET
-    };
-
-    let tokens;
-    try {
-      tokens = await googleClient.getToken(tokenOptions);
-    } catch (error) {
-      if (error.response?.data?.error === 'invalid_grant') {
-        // Diagnostic logging
-        console.error('Token exchange failed', {
-          code_length: code?.length,
-          code_prefix: code?.substring(0, 3),
-          time_since_epoch: Date.now(),
-          system_time: new Date().toISOString()
-        });
-        
-        throw new Error('Authentication timeout. Please initiate a new login');
-      }
-      throw error;
-    }
-
-    console.log(`Token exchange completed in ${Date.now() - tokenExchangeStart}ms`);
-
-    // 3. Enhanced token verification
+    const { tokens } = await googleClient.getToken({ code, redirect_uri: process.env.GOOGLE_REDIRECT_URL });
     const ticket = await googleClient.verifyIdToken({
       idToken: tokens.id_token,
-      audience: process.env.GOOGLE_CLIENT_ID
+      audience: process.env.GOOGLE_CLIENT_ID,
     });
 
     const payload = ticket.getPayload();
-    if (!payload) {
-      throw new Error('Invalid token payload - missing user information');
-    }
+    if (!payload) throw new Error('Invalid Google token payload');
 
-
-    // 4. Validate essential payload fields
-    const requiredFields = ['email', 'name', 'sub'];
-    for (const field of requiredFields) {
-      if (!payload[field]) {
-        throw new Error(`Missing required field in Google payload: ${field}`);
-      }
-    }
-
-    // 5. Process user data with sanitization
     const { email, name, picture, sub: googleId } = payload;
-    const sanitizedEmail = email.trim().toLowerCase();
     const defaultAvatar = 'https://quiznewbackend.onrender.com/profile.jpg';
-    const avatar = picture?.startsWith('https://') ? picture : defaultAvatar;
+    const avatar = picture?.startsWith('http') ? picture : defaultAvatar;
 
-    // 6. Session tracking with enhanced data
     const sessionInfo = {
       ip: (req && req.ip) ? req.ip : 'unknown',
       userAgent: (req && req.headers && req.headers['user-agent'])
         ? req.headers['user-agent']
         : 'unknown',
-      loginTime: new Date(),
-      authProvider: 'google'
+      loginTime: new Date()
     };
 
-    // 7. User upsert with atomic operations
-    let user = await User.findOneAndUpdate(
-      { $or: [{ email: sanitizedEmail }, { googleId }] },
-      {
-        $setOnInsert: {
-          name,
-          email: sanitizedEmail,
-          googleId,
-          avatar,
-          isVerified: true,
-          lastLoginAt: new Date()
-        },
-        $set: {
-          lastLoginAt: new Date(),
-          isLoggedIn: true
-        },
-        $addToSet: {
-          loginHistory: sessionInfo
-        }
-      },
-      {
-        new: true,
-        upsert: true,
-        session
-      }
-    );
+    let user = await User.findOne({ $or: [{ email }, { googleId }] }).session(session);
 
-    // 8. Stats handling with error protection
-    try {
+    if (user) {
+      if (!user.googleId) {
+        user = await User.findOneAndUpdate(
+          { _id: user._id },
+          {
+            $set: { googleId, avatar },
+            $addToSet: { loginHistory: sessionInfo },
+            lastLoginAt: new Date()
+          },
+          { new: true, yield: true, session }
+        );
+      } else {
+        user = await User.findOneAndUpdate(
+          { _id: user._id },
+          {
+            $addToSet: { loginHistory: sessionInfo },
+            lastLoginAt: new Date(),
+            isLoggedIn: true
+          },
+          { new: true, yield: true, session }
+        );
+      }
+
       const stats = await UserStats.findOneAndUpdate(
         { user: user._id },
         {
           $set: { lastActive: new Date() },
           $setOnInsert: {
-            streak: { current: 1, lastUpdated: new Date() }
+            streak: {
+              current: 1,
+              lastUpdated: new Date()
+            }
           }
         },
-        { upsert: true, new: true, session }
+        {
+          new: true,
+          upsert: true,
+          yield: true,
+          session
+        }
       );
 
       stats.updateStreak();
       await stats.save({ session });
-    } catch (statsError) {
-      console.warn('User stats update failed (non-critical):', statsError);
-      // Continue even if stats fail - this shouldn't block auth
+
+    } else {
+      user = new User({
+        name,
+        email,
+        googleId,
+        avatar,
+        isVerified: true,
+        lastLoginAt: new Date()
+      });
+      user.markAsLoggedIn(sessionInfo);
+      await user.save({ session });
+
+      const stats = new UserStats({
+        user: user._id,
+        lastActive: new Date(),
+        streak: {
+          current: 1,
+          lastUpdated: new Date()
+        }
+      });
+      await stats.save({ session });
     }
 
-    // 9. Finalize successful auth
+
+
     const token = generateToken(user);
     const userResponse = user.toObject();
 
     await session.commitTransaction();
     session.endSession();
 
-    logger.info(`Google authentication successful`, {
-      userId: user._id,
-      email: sanitizedEmail,
-      authMethod: 'google'
-    });
-
+    logger.info(`Google login successful for user: ${email}`);
     return {
       success: true,
       token,
@@ -480,61 +410,19 @@ const handleGoogleCallback = async (code, req) => {
     };
 
   } catch (error) {
-    // 10. Comprehensive error handling
-    await session.abortTransaction().catch(transactionError => {
-      console.error('Transaction abort failed:', transactionError);
-    });
+    await session.abortTransaction();
     session.endSession();
-
-    const errorContext = {
-      error: error.message,
-      errorType: error.constructor.name,
-      code: code ? `${code.substring(0, 2)}...${code.slice(-2)}` : 'none',
-      timestamp: new Date().toISOString(),
-      serverTimeOffset: new Date().getTimezoneOffset(),
-      redirectUri: process.env.GOOGLE_REDIRECT_URL,
-      headers: {
-        'user-agent': (req && req.headers && req.headers['user-agent'])
-          ? req.headers['user-agent']
-          : 'unknown',
-      }
-    };
-
-    logger.error('Google authentication failed', errorContext);
-    console.log({ errorContext });
-
-    // Return user-friendly messages based on error type
-    let userMessage = 'Authentication failed. Please try again.';
-    if (error.message.includes('invalid_grant')) {
-      userMessage = 'Your login session expired. Please sign in again.';
-    } else if (error.message.includes('token')) {
-      userMessage = 'Invalid credentials. Please try signing in again.';
-    }
-
-    throw new Error(userMessage);
+    logger.error(`Google callback error: ${error.message}`);
+    throw new Error('Google authentication failed');
   }
 };
 
 const handleFacebookCallback = async (code, req) => {
-  // 1. Input validation
-  if (!code || typeof code !== 'string') {
-    throw new Error('Invalid authorization code');
-  }
-
   const session = await User.startSession();
   session.startTransaction();
 
   try {
-    // 2. Environment verification
-    const requiredEnvVars = ['FACEBOOK_APP_ID', 'FACEBOOK_APP_SECRET', 'FACEBOOK_REDIRECT_URI'];
-    for (const varName of requiredEnvVars) {
-      if (!process.env[varName]) {
-        throw new Error(`Missing required environment variable: ${varName}`);
-      }
-    }
-
-    // 3. Token exchange with timeout protection
-    const tokenExchangeStart = Date.now();
+    // Exchange code for access token
     const tokenUrl = `https://graph.facebook.com/v19.0/oauth/access_token?` +
       querystring.stringify({
         client_id: process.env.FACEBOOK_APP_ID,
@@ -543,114 +431,116 @@ const handleFacebookCallback = async (code, req) => {
         code: code
       });
 
-    let tokenRes;
-    try {
-      tokenRes = await axios.get(tokenUrl, { timeout: 10000 }); // 10s timeout
-    } catch (error) {
-      if (error.code === 'ECONNABORTED') {
-        throw new Error('Facebook token request timed out');
-      }
-      throw error;
-    }
-
-    console.log(`Token exchange completed in ${Date.now() - tokenExchangeStart}ms`);
-
+    const tokenRes = await axios.get(tokenUrl);
     const tokenData = tokenRes.data;
+
     if (!tokenData.access_token) {
-      throw new Error('Facebook token response missing access_token');
+      throw new Error('Failed to get Facebook access token');
     }
 
-    // 4. Profile request with enhanced fields
+    // Get user profile
     const profileUrl = `https://graph.facebook.com/me?` +
       querystring.stringify({
-        fields: 'id,name,email,first_name,last_name,picture.width(500).height(500)',
+        fields: 'id,name,email,picture.width(500).height(500)',
         access_token: tokenData.access_token
       });
 
-    const profileRes = await axios.get(profileUrl, { timeout: 10000 });
+    const profileRes = await axios.get(profileUrl);
     const profileData = profileRes.data;
 
     if (profileData.error) {
       throw new Error(`Facebook API error: ${profileData.error.message}`);
     }
 
-    // 5. Data processing with fallbacks
-    const { id: facebookId, name, email, first_name, last_name, picture } = profileData;
-    const sanitizedEmail = email ? email.trim().toLowerCase() : `${facebookId}@facebook.com`;
+    const { id: facebookId, name, email, picture } = profileData;
     const defaultAvatar = 'https://quiznewbackend.onrender.com/profile.jpg';
     const avatar = picture?.data?.url || defaultAvatar;
+    const userEmail = email || `${facebookId}@facebook.com`;
 
-    // 6. Session tracking
     const sessionInfo = {
       ip: (req && req.ip) ? req.ip : 'unknown',
       userAgent: (req && req.headers && req.headers['user-agent'])
         ? req.headers['user-agent']
         : 'unknown',
-      loginTime: new Date(),
-      authProvider: 'facebook'
+      loginTime: new Date()
     };
 
-    // 7. Atomic user upsert
-    let user = await User.findOneAndUpdate(
-      { $or: [{ email: sanitizedEmail }, { facebookId }] },
-      {
-        $setOnInsert: {
-          name: name || `${first_name} ${last_name}`.trim(),
-          email: sanitizedEmail,
-          facebookId,
-          avatar,
-          isVerified: true,
-          lastLoginAt: new Date()
-        },
+    // Find or create user
+    let user = await User.findOne({ $or: [{ email: userEmail }, { facebookId }] })
+      .session(session);
+
+    if (user) {
+      const update = {
         $set: {
           lastLoginAt: new Date(),
           isLoggedIn: true,
-          ...(!email && { email: sanitizedEmail }) // Update if email was missing
+          ...(!user.facebookId && { facebookId }),
+          ...(!user.avatar?.includes('http') && { avatar })
         },
         $addToSet: {
           loginHistory: sessionInfo
         }
-      },
-      {
-        new: true,
-        upsert: true,
-        session
-      }
-    );
+      };
 
-    // 8. Stats handling (non-blocking)
-    try {
+      user = await User.findOneAndUpdate(
+        { _id: user._id },
+        update,
+        { new: true, yield: true, session }
+      );
+
       const stats = await UserStats.findOneAndUpdate(
         { user: user._id },
         {
           $set: { lastActive: new Date() },
           $setOnInsert: {
-            streak: { current: 1, lastUpdated: new Date() }
+            streak: {
+              current: 1,
+              lastUpdated: new Date()
+            }
           }
         },
-        { upsert: true, new: true, session }
+        {
+          new: true,
+          upsert: true,
+          yield: true,
+          session
+        }
       );
 
       stats.updateStreak();
       await stats.save({ session });
-    } catch (statsError) {
-      console.warn('User stats update failed:', statsError);
-      // Continue even if stats fail
+
+    } else {
+      user = new User({
+        name,
+        email: userEmail,
+        facebookId,
+        avatar,
+        isVerified: true,
+        lastLoginAt: new Date()
+      });
+      user.markAsLoggedIn(sessionInfo);
+      await user.save({ session });
+
+      const stats = new UserStats({
+        user: user._id,
+        lastActive: new Date(),
+        streak: {
+          current: 1,
+          lastUpdated: new Date()
+        }
+      });
+      await stats.save({ session });
     }
 
-    // 9. Successful auth
+
     const token = generateToken(user);
     const userResponse = user.toObject();
 
     await session.commitTransaction();
     session.endSession();
 
-    logger.info(`Facebook authentication successful`, {
-      userId: user._id,
-      email: sanitizedEmail,
-      authMethod: 'facebook'
-    });
-
+    logger.info(`Facebook login successful for user: ${user._id}`);
     return {
       success: true,
       token,
@@ -658,31 +548,10 @@ const handleFacebookCallback = async (code, req) => {
     };
 
   } catch (error) {
-    // 10. Comprehensive error handling
-    await session.abortTransaction().catch(transactionError => {
-      console.error('Transaction abort failed:', transactionError);
-    });
+    await session.abortTransaction();
     session.endSession();
-
-    const errorContext = {
-      error: error.message,
-      errorType: error.constructor.name,
-      code: code ? `${code.substring(0, 2)}...${code.slice(-2)}` : 'none',
-      timestamp: new Date().toISOString(),
-      redirectUri: process.env.FACEBOOK_REDIRECT_URI
-    };
-
-    logger.error('Facebook authentication failed', errorContext);
-
-    // User-friendly messages
-    let userMessage = 'Authentication failed. Please try again.';
-    if (error.message.includes('access_token')) {
-      userMessage = 'Facebook login expired. Please sign in again.';
-    } else if (error.message.includes('ECONN')) {
-      userMessage = 'Connection to Facebook failed. Please check your network.';
-    }
-
-    throw new Error(userMessage);
+    logger.error(`Facebook authentication failed: ${error.message}`);
+    throw new Error(`Facebook authentication failed: ${error.message}`);
   }
 };
 
@@ -796,10 +665,8 @@ const verifyOtp = async (email, otp, verificationToken, req) => {
 
     // Create session info
     const sessionInfo = {
-      ip: (req && req.ip) ? req.ip : 'unknown',
-      userAgent: (req && req.headers && req.headers['user-agent'])
-        ? req.headers['user-agent']
-        : 'unknown',
+      ip: req.ip,
+      userAgent: req.headers['user-agent'],
       loginTime: new Date()
     };
 
