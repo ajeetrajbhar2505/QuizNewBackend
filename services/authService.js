@@ -369,8 +369,10 @@ const handleGoogleCallback = async (code, req) => {
 
     // 6. Session tracking with enhanced data
     const sessionInfo = {
-      ip: req.ip || 'unknown',
-      userAgent: req.headers['user-agent'] || 'unknown',
+      ip: (req && req.ip) ? req.ip : 'unknown',
+      userAgent: (req && req.headers && req.headers['user-agent']) 
+        ? req.headers['user-agent'] 
+        : 'unknown',
       loginTime: new Date(),
       authProvider: 'google'
     };
@@ -542,8 +544,10 @@ const handleFacebookCallback = async (code, req) => {
 
     // 6. Session tracking
     const sessionInfo = {
-      ip: req.ip || 'unknown',
-      userAgent: req.headers['user-agent'] || 'unknown',
+      ip: (req && req.ip) ? req.ip : 'unknown',
+  userAgent: (req && req.headers && req.headers['user-agent']) 
+    ? req.headers['user-agent'] 
+    : 'unknown',
       loginTime: new Date(),
       authProvider: 'facebook'
     };
@@ -757,8 +761,10 @@ const verifyOtp = async (email, otp, verificationToken, req) => {
 
     // Create session info
     const sessionInfo = {
-      ip: req.ip,
-      userAgent: req.headers['user-agent'] || 'unknown',
+      ip: (req && req.ip) ? req.ip : 'unknown',
+      userAgent: (req && req.headers && req.headers['user-agent']) 
+        ? req.headers['user-agent'] 
+        : 'unknown',
       loginTime: new Date()
     };
 
