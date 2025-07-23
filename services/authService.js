@@ -317,23 +317,23 @@ const handleGoogleCallback = async (code, req) => {
 
     // 2. Add timeout protection for token exchange
     const tokenExchangeStart = Date.now();
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
-    let tokens;
-    try {
 
-      const { tokens } = await googleClient.getToken({ code });
-      tokens = tokens
-
-    } catch (error) {
+    const tokenOptions = {
+      code,
+      redirect_uri: process.env.GOOGLE_REDIRECT_URL,
+      client_id: process.env.GOOGLE_CLIENT_ID,
+      client_secret: process.env.GOOGLE_CLIENT_SECRET
+    };
+    
+    const { tokens } = await googleClient.getToken(tokenOptions).catch(async error => {
       if (error.message.includes('invalid_grant')) {
-        // Specific handling for common Google errors
-        throw new Error('Authorization code expired or already used. Please sign in again.');
+        // First try failed - attempt one refresh
+        console.warn('First token exchange failed, retrying...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        return googleClient.getToken(tokenOptions);
       }
       throw error;
-    } finally {
-      clearTimeout(timeout);
-    }
+    });
 
     console.log(`Token exchange completed in ${Date.now() - tokenExchangeStart}ms`);
 
@@ -365,8 +365,8 @@ const handleGoogleCallback = async (code, req) => {
     // 6. Session tracking with enhanced data
     const sessionInfo = {
       ip: (req && req.ip) ? req.ip : 'unknown',
-      userAgent: (req && req.headers && req.headers['user-agent']) 
-        ? req.headers['user-agent'] 
+      userAgent: (req && req.headers && req.headers['user-agent'])
+        ? req.headers['user-agent']
         : 'unknown',
       loginTime: new Date(),
       authProvider: 'google'
@@ -411,7 +411,7 @@ const handleGoogleCallback = async (code, req) => {
         },
         { upsert: true, new: true, session }
       );
-      
+
       stats.updateStreak();
       await stats.save({ session });
     } catch (statsError) {
@@ -453,14 +453,14 @@ const handleGoogleCallback = async (code, req) => {
       serverTimeOffset: new Date().getTimezoneOffset(),
       redirectUri: process.env.GOOGLE_REDIRECT_URL,
       headers: {
-        'user-agent': (req && req.headers && req.headers['user-agent']) 
-        ? req.headers['user-agent'] 
-        : 'unknown',
+        'user-agent': (req && req.headers && req.headers['user-agent'])
+          ? req.headers['user-agent']
+          : 'unknown',
       }
     };
 
     logger.error('Google authentication failed', errorContext);
-    console.log({errorContext});
+    console.log({ errorContext });
 
     // Return user-friendly messages based on error type
     let userMessage = 'Authentication failed. Please try again.';
@@ -542,9 +542,9 @@ const handleFacebookCallback = async (code, req) => {
     // 6. Session tracking
     const sessionInfo = {
       ip: (req && req.ip) ? req.ip : 'unknown',
-  userAgent: (req && req.headers && req.headers['user-agent']) 
-    ? req.headers['user-agent'] 
-    : 'unknown',
+      userAgent: (req && req.headers && req.headers['user-agent'])
+        ? req.headers['user-agent']
+        : 'unknown',
       loginTime: new Date(),
       authProvider: 'facebook'
     };
@@ -589,7 +589,7 @@ const handleFacebookCallback = async (code, req) => {
         },
         { upsert: true, new: true, session }
       );
-      
+
       stats.updateStreak();
       await stats.save({ session });
     } catch (statsError) {
@@ -756,8 +756,8 @@ const verifyOtp = async (email, otp, verificationToken, req) => {
     // Create session info
     const sessionInfo = {
       ip: (req && req.ip) ? req.ip : 'unknown',
-      userAgent: (req && req.headers && req.headers['user-agent']) 
-        ? req.headers['user-agent'] 
+      userAgent: (req && req.headers && req.headers['user-agent'])
+        ? req.headers['user-agent']
         : 'unknown',
       loginTime: new Date()
     };
