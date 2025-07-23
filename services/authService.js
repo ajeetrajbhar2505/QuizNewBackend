@@ -297,24 +297,29 @@ const logoutUser = async (userId) => {
   await user.save();
 };
 
-const generateGoogleAuthUrl = async () => {
-  const { challenge } = generatePKCE();
-  return {
-    url: await googleClient.generateAuthUrl({
-      access_type: 'offline',
-      prompt: 'consent',
-      scope: ['profile', 'email'],
-      code_challenge: challenge,
-      code_challenge_method: 'S256'
-    }),
-    verifier
-  };
+const generateGoogleAuthUrl = async (req) => {
+  const { challenge,verifier } = generatePKCE();
+  req.session.oauthVerifier = verifier;
+  req.session.save();
+
+  return await googleClient.generateAuthUrl({
+    access_type: 'offline',
+    prompt: 'consent',
+    scope: ['profile', 'email'],
+    code_challenge: challenge,
+    code_challenge_method: 'S256'
+  });
 };
 
 const generateFacebookAuthUrl = () => {
   return `https://www.facebook.com/v19.0/dialog/oauth?client_id=${process.env.FACEBOOK_APP_ID}&redirect_uri=${encodeURIComponent(process.env.FACEBOOK_REDIRECT_URI)}&scope=email,public_profile&response_type=code&auth_type=rerequest`;
 };
 const handleGoogleCallback = async (code, req) => {
+
+  if (!req.session.oauthVerifier) {
+    throw new Error('Missing OAuth verifier - restart login flow');
+  }
+
   // Validate input immediately
   if (!code || typeof code !== 'string') {
     throw new Error('Invalid authorization code');
@@ -347,7 +352,7 @@ const handleGoogleCallback = async (code, req) => {
     const tokenOptions = {
       code,
       redirect_uri: process.env.GOOGLE_REDIRECT_URL,
-      code_verifier: verifier,
+      code_verifier: req.session.oauthVerifier ,
       client_id: process.env.GOOGLE_CLIENT_ID,
       client_secret: process.env.GOOGLE_CLIENT_SECRET
     };
@@ -383,6 +388,9 @@ const handleGoogleCallback = async (code, req) => {
       throw new Error('Invalid token payload - missing user information');
     }
 
+    delete req.session.oauthVerifier;
+    req.session.save();
+    
     // 4. Validate essential payload fields
     const requiredFields = ['email', 'name', 'sub'];
     for (const field of requiredFields) {
