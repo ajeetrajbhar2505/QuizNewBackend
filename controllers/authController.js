@@ -113,6 +113,7 @@ const googleCallback = async (socket, code) => {
         socket.emit('auth:google:success', { token, user });
         logger.info(`Google login successful for user: ${user.name}`);
       } catch (error) {
+        console.log(error);
         lastError = error;
         retryCount++;
         if (retryCount < maxRetries) {

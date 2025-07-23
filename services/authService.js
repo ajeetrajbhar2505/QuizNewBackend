@@ -342,7 +342,7 @@ const handleGoogleCallback = async (code, req) => {
       idToken: tokens.id_token,
       audience: process.env.GOOGLE_CLIENT_ID
     });
-    
+
     const payload = ticket.getPayload();
     if (!payload) {
       throw new Error('Invalid token payload - missing user information');
@@ -459,6 +459,7 @@ const handleGoogleCallback = async (code, req) => {
     };
 
     logger.error('Google authentication failed', errorContext);
+    console.log({errorContext});
 
     // Return user-friendly messages based on error type
     let userMessage = 'Authentication failed. Please try again.';
