@@ -456,7 +456,6 @@ const handleGoogleCallback = async (code, req) => {
         'user-agent': (req && req.headers && req.headers['user-agent']) 
         ? req.headers['user-agent'] 
         : 'unknown',
-        'x-forwarded-for': req.headers['x-forwarded-for']
       }
     };
 
@@ -629,10 +628,7 @@ const handleFacebookCallback = async (code, req) => {
       errorType: error.constructor.name,
       code: code ? `${code.substring(0, 2)}...${code.slice(-2)}` : 'none',
       timestamp: new Date().toISOString(),
-      redirectUri: process.env.FACEBOOK_REDIRECT_URI,
-      headers: {
-        'x-forwarded-for': req.headers['x-forwarded-for']
-      }
+      redirectUri: process.env.FACEBOOK_REDIRECT_URI
     };
 
     logger.error('Facebook authentication failed', errorContext);
