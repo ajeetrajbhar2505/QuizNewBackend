@@ -318,16 +318,17 @@ const handleGoogleCallback = async (code, req) => {
     // 2. Add timeout protection for token exchange
     const tokenExchangeStart = Date.now();
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000); // 10s timeout
-
+    const timeout = setTimeout(() => controller.abort(), 10000);
     let tokens;
     try {
-      tokens = await googleClient.getToken({
+
+      const tokenResponse = await googleClient.getToken({
         code,
         redirect_uri: process.env.GOOGLE_REDIRECT_URL,
-        client_id: process.env.GOOGLE_CLIENT_ID,
-        client_secret: process.env.GOOGLE_CLIENT_SECRET
       });
+      tokens = tokenResponse.tokens;
+      console.log({tokens});
+      googleClient.setCredentials(tokens);
 
     } catch (error) {
       if (error.message.includes('invalid_grant')) {
