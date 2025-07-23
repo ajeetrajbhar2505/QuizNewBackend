@@ -290,7 +290,7 @@ const generateGoogleAuthUrl = async () => {
   return await googleClient.generateAuthUrl({
     access_type: 'online',
     scope: ['https://www.googleapis.com/auth/userinfo.profile', 'https://www.googleapis.com/auth/userinfo.email'],
-    prompt: 'select_account'
+    prompt: 'consent'
   });
 };
 
@@ -325,7 +325,10 @@ const handleGoogleCallback = async (code, req) => {
       tokens = await googleClient.getToken({
         code,
         redirect_uri: process.env.GOOGLE_REDIRECT_URL,
+        client_id: process.env.GOOGLE_CLIENT_ID,
+        client_secret: process.env.GOOGLE_CLIENT_SECRET
       });
+
     } catch (error) {
       if (error.message.includes('invalid_grant')) {
         // Specific handling for common Google errors
