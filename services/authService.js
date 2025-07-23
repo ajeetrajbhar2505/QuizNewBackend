@@ -20,6 +20,17 @@ const transporter = nodemailer.createTransport({
   },
 });
 
+const generatePKCE = () => {
+  const verifier = crypto.randomBytes(32).toString('hex');
+  const challenge = crypto.createHash('sha256')
+    .update(verifier)
+    .digest('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+  return { verifier, challenge };
+};
+
 const googleClient = new OAuth2Client(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
@@ -287,11 +298,17 @@ const logoutUser = async (userId) => {
 };
 
 const generateGoogleAuthUrl = async () => {
-  return await googleClient.generateAuthUrl({
-    access_type: 'online',
-    scope: ['profile', 'email'],
-    prompt: 'consent'
-  });
+  const { challenge } = generatePKCE();
+  return {
+    url: await googleClient.generateAuthUrl({
+      access_type: 'offline',
+      prompt: 'consent',
+      scope: ['profile', 'email'],
+      code_challenge: challenge,
+      code_challenge_method: 'S256'
+    }),
+    verifier
+  };
 };
 
 const generateFacebookAuthUrl = () => {
@@ -315,25 +332,43 @@ const handleGoogleCallback = async (code, req) => {
       }
     }
 
+    const timeCheck = await axios.get('https://worldtimeapi.org/api/ip')
+    .then(res => Math.abs(Date.now() - new Date(res.data.unixtime * 1000)))
+    .catch(() => 0);
+
+  if (timeCheck > 30000) { // 30s threshold
+    throw new Error('System time out of sync with Google servers');
+  }
+
+
     // 2. Add timeout protection for token exchange
     const tokenExchangeStart = Date.now();
 
     const tokenOptions = {
       code,
       redirect_uri: process.env.GOOGLE_REDIRECT_URL,
+      code_verifier: verifier,
       client_id: process.env.GOOGLE_CLIENT_ID,
       client_secret: process.env.GOOGLE_CLIENT_SECRET
     };
-    
-    const { tokens } = await googleClient.getToken(tokenOptions).catch(async error => {
-      if (error.message.includes('invalid_grant')) {
-        // First try failed - attempt one refresh
-        console.warn('First token exchange failed, retrying...');
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        return googleClient.getToken(tokenOptions);
+
+    let tokens;
+    try {
+      tokens = await googleClient.getToken(tokenOptions);
+    } catch (error) {
+      if (error.response?.data?.error === 'invalid_grant') {
+        // Diagnostic logging
+        console.error('Token exchange failed', {
+          code_length: code?.length,
+          code_prefix: code?.substring(0, 3),
+          time_since_epoch: Date.now(),
+          system_time: new Date().toISOString()
+        });
+        
+        throw new Error('Authentication timeout. Please initiate a new login');
       }
       throw error;
-    });
+    }
 
     console.log(`Token exchange completed in ${Date.now() - tokenExchangeStart}ms`);
 
