@@ -453,7 +453,9 @@ const handleGoogleCallback = async (code, req) => {
       serverTimeOffset: new Date().getTimezoneOffset(),
       redirectUri: process.env.GOOGLE_REDIRECT_URL,
       headers: {
-        'user-agent': req.headers['user-agent'] || 'unknown',
+        'user-agent': (req && req.headers && req.headers['user-agent']) 
+        ? req.headers['user-agent'] 
+        : 'unknown',
         'x-forwarded-for': req.headers['x-forwarded-for']
       }
     };
