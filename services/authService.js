@@ -21,7 +21,7 @@ const transporter = nodemailer.createTransport({
 });
 
 const generatePKCE = () => {
-  const verifier = crypto.randomBytes(32).toString('hex');
+  let verifier = crypto.randomBytes(32).toString('hex');
   const challenge = crypto.createHash('sha256')
     .update(verifier)
     .digest('base64')
@@ -30,7 +30,7 @@ const generatePKCE = () => {
     .replace(/=+$/, '');
   return { verifier, challenge };
 };
-let verifier;
+let generatePKCEverifier;
 
 const googleClient = new OAuth2Client(
   process.env.GOOGLE_CLIENT_ID,
@@ -299,8 +299,8 @@ const logoutUser = async (userId) => {
 };
 
 const generateGoogleAuthUrl = async (req) => {
-  const { challenge,verifier } = generatePKCE();
-  verifier = verifier
+  let { challenge,verifier } = generatePKCE();
+  generatePKCEverifier = verifier
 
   return await googleClient.generateAuthUrl({
     access_type: 'offline',
@@ -316,7 +316,7 @@ const generateFacebookAuthUrl = () => {
 };
 const handleGoogleCallback = async (code, req) => {
 
-  if (!verifier) {
+  if (!generatePKCEverifier) {
     throw new Error('Missing OAuth verifier - restart login flow');
   }
 
@@ -352,7 +352,7 @@ const handleGoogleCallback = async (code, req) => {
     const tokenOptions = {
       code,
       redirect_uri: process.env.GOOGLE_REDIRECT_URL,
-      code_verifier: verifier,
+      code_verifier: generatePKCEverifier,
       client_id: process.env.GOOGLE_CLIENT_ID,
       client_secret: process.env.GOOGLE_CLIENT_SECRET
     };
