@@ -374,7 +374,7 @@ router.post('/auth/google/login', async (req, res) => {
     };
 })
 
-router.post('/auth/facebook/login', async () => {
+router.post('/auth/facebook/login', async (req,res) => {
     try {
         const url = await authService.generateFacebookAuthUrl();
         res.send({ url })
