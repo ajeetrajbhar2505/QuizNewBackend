@@ -16,7 +16,7 @@ const oauthRoutes = require('./routes/oauthRoutes');
 // Initialize Express app
 const app = express();
 const server = http.createServer(app);
-
+const cors = require('cors')
 // Connect to database
 connectDB();
 
@@ -24,6 +24,7 @@ connectDB();
 app.use(express.json());
 app.use(express.static('public'));
 app.use(oauthRoutes);
+app.use(cors());
 
 // Initialize Socket.io
 const io = initSocket(server);
