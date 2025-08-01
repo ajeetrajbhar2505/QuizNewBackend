@@ -337,6 +337,7 @@ router.get('/auth/facebook/callback', async (req, res) => {
 
 router.get('/auth/login', async (req, res) => {
     try {
+        const email  = req.body
         const result = await authService.loginWithOtp(email);
         res.send(result)
     } catch (error) {
@@ -347,6 +348,7 @@ router.get('/auth/login', async (req, res) => {
 router.get('/auth/verifyOtpAndLogin', async (req, res) => {
     try {
 
+        const { email, otp, verificationToken } = req.body
         const result = await authService.verifyOtpAndLogin(
             email,
             otp,
