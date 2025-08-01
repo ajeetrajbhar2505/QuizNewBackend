@@ -19,6 +19,7 @@ const login = async (socket, email) => {
     logger.info(`User logged in: ${email}`);
   } catch (error) {
     socket.emit('auth:login:error', { message: error.message });
+    console.log(error);
     logger.error(`Login error: ${error.message}`);
   }
 };
@@ -42,7 +43,7 @@ const verifyOtpAndLogin = async (socket, email, otp, verificationToken) => {
       message: error.message,
       email: email
     });
-    
+    console.log(error);
     logger.error(`OTP verification failed for ${email}: ${error.message}`);
   }
 };
@@ -122,6 +123,7 @@ const googleCallback = async (socket, code) => {
     }
   } catch (error) {
     logger.error(`Google callback error: ${error.message}`);
+    console.log(error);
     socket.emit('auth:google:error', {
       message: 'Authentication failed. Please try again.',
       retryable: false
@@ -169,6 +171,7 @@ const facebookCallback = async (socket, code) => {
     }
   } catch (error) {
     logger.error('Facebook callback error:', error);
+    console.log(error);
     socket.emit('auth:facebook:error', {
       message: 'Authentication failed. Please try again.',
       retryable: false

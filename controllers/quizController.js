@@ -1,6 +1,5 @@
 const quizService = require('../services/quizService');
 const logger = require('../config/logger');
-const { getIO } = require('../config/socket');
 
 const createQuiz = async (socket, data) => {
   try {
@@ -27,7 +26,7 @@ const refreshQuestion = async (socket, quizId,questionIndex) => {
 const getPublishedQuiz = async (socket) => {
   try {
     const quizes = await quizService.getPublishedQuiz(socket.user._id);
-    getIO().emit('quiz:published:success', { quizes });
+    socket.emit('quiz:published:success', { quizes });
     logger.info(`Quiz all by user ${socket.user._id}`);
   } catch (error) {
     socket.emit('quiz:published:error', { error: error.message });
@@ -38,7 +37,7 @@ const getPublishedQuiz = async (socket) => {
 const getAllQuiz = async (socket) => {
   try {
     const quizes = await quizService.getAllQuiz(socket.user._id);
-    getIO().emit('quiz:all:success', { quizes });
+    socket.emit('quiz:all:success', { quizes });
     logger.info(`Quiz all by user ${socket.user._id}`);
   } catch (error) {
     socket.emit('quiz:all:error', { error: error.message });
@@ -81,7 +80,7 @@ const publish = async (socket, quizId, publish, approvalStatus) => {
 const startQuiz = async (socket, quizId) => {
   try {
     const activeQuiz = await quizService.startQuiz(quizId, socket.user._id);
-    getIO().to(`quiz_${quizId}`).emit('quiz:start:success', { activeQuiz });
+    socket.to(`quiz_${quizId}`).emit('quiz:start:success', { activeQuiz });
     logger.info(`Quiz ${quizId} started by user ${socket.user._id}`);
   } catch (error) {
     socket.emit('quiz:start:error', { error: error.message });
