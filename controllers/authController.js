@@ -14,11 +14,7 @@ const register = async (socket, data) => {
 
 const login = async (socket, email) => {
   try {
-    const sessionInfo = {
-      ipAddress: socket.handshake.address,
-      userAgent: socket.handshake.headers['user-agent']
-    };
-    const result = await authService.loginWithOtp(email, sessionInfo);
+    const result = await authService.loginWithOtp(email);
     socket.emit('auth:login:success', result);
     logger.info(`User logged in: ${email}`);
   } catch (error) {
@@ -29,23 +25,18 @@ const login = async (socket, email) => {
 
 const verifyOtpAndLogin = async (socket, email, otp, verificationToken) => {
   try {
-    const sessionInfo = {
-      ipAddress: socket.handshake.address,
-      userAgent: socket.handshake.headers['user-agent']
-    };
     
     const result = await authService.verifyOtpAndLogin(
       email, 
       otp, 
-      verificationToken, 
-      sessionInfo
+      verificationToken
     );
     
     socket.emit('auth:otp:verify:success', {
       token: result.token,
       user: result.user
     });
-    
+    socket.emit('quiz:all');
     logger.info(`OTP verified and user logged in: ${email}`);
   } catch (error) {
     socket.emit('auth:otp:verify:error', { 
@@ -111,6 +102,7 @@ const googleCallback = async (socket, code) => {
         const { token, user } = await authService.handleGoogleCallback(code, sessionInfo);
         success = true;
         socket.emit('auth:google:success', { token, user });
+        socket.emit('quiz:all');
         logger.info(`Google login successful for user: ${user.name}`);
       } catch (error) {
         console.log(error);
@@ -157,6 +149,7 @@ const facebookCallback = async (socket, code) => {
 
         const { token, user } = await authService.handleFacebookCallback(code, sessionInfo);
         socket.emit('auth:facebook:success', { token, user });
+        socket.emit('quiz:all');
         logger.info(`Facebook login successful for user: ${user.name}`);
         success = true;
         socket.emit('auth:facebook:success', user);

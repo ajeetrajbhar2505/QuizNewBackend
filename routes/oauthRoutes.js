@@ -1,17 +1,17 @@
 const express = require('express');
 const router = express.Router();
-const authController = require('../controllers/authController');
+const authService = require('../services/authService');
 const logger = require('../config/logger');
 const { getIO } = require('../config/socket');
 
 // Google OAuth callback
 router.get('/auth/google/callback', async (req, res) => {
-  try {
-    const { code } = req.query;
-    const socket = getIO();
+    try {
+        const { code } = req.query;
+        const socket = getIO();
 
-    if (!socket) {
-      return res.send(`
+        if (!socket) {
+            return res.send(`
       <!DOCTYPE html>
 <html>
 <head>
@@ -60,13 +60,13 @@ router.get('/auth/google/callback', async (req, res) => {
 </body>
 </html>
         `);
-    }
+        }
 
-    // Forward the code to the socket handler
-    console.log({ 'auth:google:callback': code });
-    socket.emit('auth:google:callback', code);
+        // Forward the code to the socket handler
+        console.log({ 'auth:google:callback': code });
+        socket.emit('auth:google:callback', code);
 
-    res.send(`
+        res.send(`
     <!DOCTYPE html>
     <html>
     <head>
@@ -115,10 +115,10 @@ router.get('/auth/google/callback', async (req, res) => {
     </body>
     </html>
         `);
-  } catch (error) {
-    logger.error(`Google callback route error: ${error.message}`);
-    console.log({ 'auth:google:callback:error': error });
-    res.status(500).send(`
+    } catch (error) {
+        logger.error(`Google callback route error: ${error.message}`);
+        console.log({ 'auth:google:callback:error': error });
+        res.status(500).send(`
     <!DOCTYPE html>
     <html>
     <head>
@@ -167,16 +167,16 @@ router.get('/auth/google/callback', async (req, res) => {
     </body>
     </html>
       `);
-  }
+    }
 });
 // Facebook OAuth callback
 router.get('/auth/facebook/callback', async (req, res) => {
-  try {
-    const { code } = req.query;
-    const socket = getIO();
+    try {
+        const { code } = req.query;
+        const socket = getIO();
 
-    if (!socket) {
-      return res.send(`
+        if (!socket) {
+            return res.send(`
       <!DOCTYPE html>
       <html>
       <head>
@@ -225,13 +225,13 @@ router.get('/auth/facebook/callback', async (req, res) => {
       </body>
       </html>
             `);
-    }
+        }
 
-    // Forward the code to the socket handler
-    socket.emit('auth:facebook:callback', code);
-    console.log({ 'auth:facebook:callback': code });
+        // Forward the code to the socket handler
+        socket.emit('auth:facebook:callback', code);
+        console.log({ 'auth:facebook:callback': code });
 
-    res.send(`
+        res.send(`
     <!DOCTYPE html>
     <html>
     <head>
@@ -280,10 +280,10 @@ router.get('/auth/facebook/callback', async (req, res) => {
     </body>
     </html>
         `);
-  } catch (error) {
-    logger.error(`Facebook callback route error: ${error.message}`);
-    console.log({ 'auth:facebook:callback:error': error });
-    res.status(500).send(`
+    } catch (error) {
+        logger.error(`Facebook callback route error: ${error.message}`);
+        console.log({ 'auth:facebook:callback:error': error });
+        res.status(500).send(`
     <!DOCTYPE html>
     <html>
     <head>
@@ -332,7 +332,53 @@ router.get('/auth/facebook/callback', async (req, res) => {
     </body>
     </html>
           `);
-  }
+    }
 });
+
+router.get('/auth/login', async (req, res) => {
+    try {
+        const result = await authService.loginWithOtp(email);
+        res.send(result)
+    } catch (error) {
+        logger.error(`Login auth error: ${error.message}`);
+    };
+})
+
+router.get('/auth/verifyOtpAndLogin', async (req, res) => {
+    try {
+
+        const result = await authService.verifyOtpAndLogin(
+            email,
+            otp,
+            verificationToken
+        );
+        res.send({
+            token: result.token,
+            user: result.user
+        })
+    } catch (error) {
+        logger.error(`Login auth error: ${error.message}`);
+    };
+})
+
+
+
+router.get('/auth/google/login', async (req, res) => {
+    try {
+        const url = await authService.generateGoogleAuthUrl();
+        res.send({ url })
+    } catch (error) {
+        logger.error(`Google auth error: ${error.message}`);
+    };
+})
+
+router.get('/auth/facebook/login', async () => {
+    try {
+        const url = await authService.generateFacebookAuthUrl();
+        res.send({ url })
+    } catch (error) {
+        logger.error(`Facebook auth error: ${error.message}`);
+    };
+})
 
 module.exports = router;
