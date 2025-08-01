@@ -335,7 +335,7 @@ router.get('/auth/facebook/callback', async (req, res) => {
     }
 });
 
-router.get('/auth/login', async (req, res) => {
+router.post('/auth/login', async (req, res) => {
     try {
         const email  = req.body
         const result = await authService.loginWithOtp(email);
@@ -345,7 +345,7 @@ router.get('/auth/login', async (req, res) => {
     };
 })
 
-router.get('/auth/verifyOtpAndLogin', async (req, res) => {
+router.post('/auth/verifyOtpAndLogin', async (req, res) => {
     try {
 
         const { email, otp, verificationToken } = req.body
@@ -365,7 +365,7 @@ router.get('/auth/verifyOtpAndLogin', async (req, res) => {
 
 
 
-router.get('/auth/google/login', async (req, res) => {
+router.post('/auth/google/login', async (req, res) => {
     try {
         const url = await authService.generateGoogleAuthUrl();
         res.send({ url })
@@ -374,7 +374,7 @@ router.get('/auth/google/login', async (req, res) => {
     };
 })
 
-router.get('/auth/facebook/login', async () => {
+router.post('/auth/facebook/login', async () => {
     try {
         const url = await authService.generateFacebookAuthUrl();
         res.send({ url })
