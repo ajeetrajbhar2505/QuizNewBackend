@@ -164,8 +164,8 @@ const verifyOtpAndLogin = async (email, otp, verificationToken, req) => {
     if (!user) throw new Error('User not found');
 
     const sessionInfo = {
-      ip: req.ipAddress,
-      userAgent: req.userAgent,
+      ip: req && req.ipAddress || 'ipAddress',
+      userAgent: req &&  req.userAgent || 'userAgent',
       loginTime: new Date()
     };
 
