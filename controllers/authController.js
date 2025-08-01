@@ -36,7 +36,6 @@ const verifyOtpAndLogin = async (socket, email, otp, verificationToken) => {
       token: result.token,
       user: result.user
     });
-    socket.emit('quiz:all');
     logger.info(`OTP verified and user logged in: ${email}`);
   } catch (error) {
     socket.emit('auth:otp:verify:error', { 
@@ -102,7 +101,6 @@ const googleCallback = async (socket, code) => {
         const { token, user } = await authService.handleGoogleCallback(code, sessionInfo);
         success = true;
         socket.emit('auth:google:success', { token, user });
-        socket.emit('quiz:all');
         logger.info(`Google login successful for user: ${user.name}`);
       } catch (error) {
         console.log(error);
@@ -149,7 +147,6 @@ const facebookCallback = async (socket, code) => {
 
         const { token, user } = await authService.handleFacebookCallback(code, sessionInfo);
         socket.emit('auth:facebook:success', { token, user });
-        socket.emit('quiz:all');
         logger.info(`Facebook login successful for user: ${user.name}`);
         success = true;
         socket.emit('auth:facebook:success', user);
