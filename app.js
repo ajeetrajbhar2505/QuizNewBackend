@@ -2,47 +2,59 @@ require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const connectDB = require('./config/database');
-const { initSocket } = require('./config/socket');
+const { initSocket, getIO } = require('./config/socket');
 const logger = require('./config/logger');
+const cors = require('cors');
 
-// Import route setup functions
-const setupAuthRoutes = require('./routes/authRoutes');
-const setupQuizRoutes = require('./routes/quizRoutes');
-const setupUserRoutes = require('./routes/userRoutes');
-const setupPaymentRoutes = require('./routes/paymentRoutes');
-const setupNotificationRoutes = require('./routes/notificationRoutes');
-const setupDashboardRoutes = require('./routes/dashboardRoutes');
-const oauthRoutes = require('./routes/oauthRoutes');
 // Initialize Express app
 const app = express();
 const server = http.createServer(app);
-const cors = require('cors')
-app.use(cors());
+
 // Connect to database
 connectDB();
 
 // Middleware
+app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
+
+// Routes
+const oauthRoutes = require('./routes/oauthRoutes');
 app.use(oauthRoutes);
 
-// Initialize Socket.io
+// Initialize Socket.io with namespaces
 const io = initSocket(server);
 
-// Socket.io connection handling
-io.on('connection', (socket) => {
-  logger.info(`Client connected: ${socket.id}`);
+// Get namespaces
+const publicNamespace = io.of('/public');
+const privateNamespace = io.of('/private');
 
-  // Setup all routes
-  setupAuthRoutes(socket);
-  setupQuizRoutes(socket);
-  setupUserRoutes(socket);
-  setupPaymentRoutes(socket);
-  setupNotificationRoutes(socket);
-  setupDashboardRoutes(socket);
+// Public namespace routes (unauthenticated)
+publicNamespace.on('connection', (socket) => {
+  logger.info(`New public client connected: ${socket.id}`);
+
+  // Setup auth routes
+  require('./routes/authRoutes')(socket);
 
   socket.on('disconnect', () => {
-    logger.info(`Client disconnected: ${socket.id}`);
+    logger.info(`Public client disconnected: ${socket.id}`);
+  });
+});
+
+// Private namespace routes (authenticated)
+privateNamespace.use(require('./middlewares/socketAuth').authenticate);
+privateNamespace.on('connection', (socket) => {
+  logger.info(`New private client connected: ${socket.id} (User ID: ${socket.user?.id || 'unknown'})`);
+
+  // Setup authenticated routes
+  require('./routes/quizRoutes')(socket);
+  require('./routes/userRoutes')(socket);
+  require('./routes/paymentRoutes')(socket);
+  require('./routes/notificationRoutes')(socket);
+  require('./routes/dashboardRoutes')(socket);
+
+  socket.on('disconnect', () => {
+    logger.info(`Private client disconnected: ${socket.id}`);
   });
 });
 
