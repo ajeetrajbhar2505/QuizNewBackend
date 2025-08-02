@@ -115,11 +115,6 @@ const googleCallback = async (socket, code) => {
 
     if (!success) {
       logger.error(`Google auth failed after ${maxRetries} attempts`, lastError);
-      socket.emit('auth:google:error', {
-        message: 'Authentication failed due to system busy. Please try again later.',
-        retryable: true,
-        originalError: lastError.message
-      });
     }
   } catch (error) {
     logger.error(`Google callback error: ${error.message}`);
@@ -163,11 +158,6 @@ const facebookCallback = async (socket, code) => {
 
     if (!success) {
       logger.error(`Facebook auth failed after ${maxRetries} attempts`, lastError);
-      socket.emit('auth:facebook:error', {
-        message: 'Authentication failed due to system busy. Please try again later.',
-        retryable: true,
-        originalError: lastError.message
-      });
     }
   } catch (error) {
     logger.error('Facebook callback error:', error);
