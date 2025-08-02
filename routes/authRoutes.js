@@ -1,15 +1,16 @@
 const authController = require('../controllers/authController');
+const logger = require('../config/logger');
 
-const setupAuthRoutes = (socket) => {
-  // Error handling middleware
-    socket.on('auth:logout', (data) => authController.logout(socket, data));
-    
-    socket.on('error', (error) => {
-    console.error('Socket error:', error);
-    socket.emit('auth:error', { 
-      message: error.message || 'Authentication error occurred' 
-    });
+module.exports = (socket) => {
+  socket.on('auth:register', (data) => {
+    logger.debug(`Register attempt from ${socket.id}`);
+    authController.register(socket, data);
   });
-};
 
-module.exports = setupAuthRoutes;
+  socket.on('auth:login', (data) => {
+    logger.debug(`Login attempt from ${socket.id}`);
+    authController.login(socket, data);
+  });
+
+  // Add other auth-related events...
+};
