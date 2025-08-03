@@ -8,8 +8,11 @@ const AimlQuizService = require('./openai.service');
 
 const createQuiz = async (data, userId) => {
   const geminiResponse = await AimlQuizService.generateQuiz(data.prompt);
-  const quizDoc = transformGeminiResponseToQuiz(geminiResponse, userId);
+  const quizDoc = await transformGeminiResponseToQuiz(geminiResponse, userId);
   const newQuiz = await Quiz.create(quizDoc);
+  if (quizDoc.isAdminCreated) {
+    await createAdminQuizzesForTutors(quizDoc, newQuiz._id);
+  }
   return newQuiz;
 };
 
@@ -39,10 +42,7 @@ const getAllQuiz = async (userId) => {
 
     const quizzes = await Quiz.find(
       {
-        $or: [
-          { isAdminCreated: true },
-          { createdBy: userId }
-        ]
+        createdBy: userId 
       },
       {
         difficulty: 1,
@@ -294,6 +294,24 @@ async function transformGeminiResponseToQuiz(geminiResponse, userId) {
 }
 
 
+async function createAdminQuizzesForTutors(baseQuiz, originalQuizId) {
+  const tutors = await User.find({ role: 'tutor' }).select('_id');
+
+  // Bulk insert optimized for performance
+  const quizCopies = tutors.map(tutor => ({
+    ...baseQuiz,
+    createdBy: tutor._id,
+    isAdminCreated: true,
+    isPublic: false,
+    source: 'admin-template',
+    originalQuizId: originalQuizId,
+    approvalStatus: 'pending'
+  }));
+
+  const createdQuizzes = await Quiz.insertMany(quizCopies);
+
+  return createdQuizzes[0];
+}
 
 module.exports = {
   createQuiz,
