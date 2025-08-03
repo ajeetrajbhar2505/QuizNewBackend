@@ -1,4 +1,5 @@
 const Quiz = require('../models/Quiz');
+const User = require('../models/User');
 const ActiveQuiz = require('../models/ActiveQuiz');
 const UserStats = require('../models/UserStats');
 const logger = require('../config/logger');
@@ -37,7 +38,12 @@ const getAllQuiz = async (userId) => {
     }
 
     const quizzes = await Quiz.find(
-      { createdBy: userId },
+      {
+        $or: [
+          { isAdminCreated: true },
+          { createdBy: userId }
+        ]
+      },
       {
         difficulty: 1,
         title: 1,
@@ -232,8 +238,17 @@ const updateUserStats = async (userId, isCorrect) => {
   return stats;
 };
 
-function transformGeminiResponseToQuiz(geminiResponse, userId) {
+async function transformGeminiResponseToQuiz(geminiResponse, userId) {
   // Transform each question to match your schema
+
+  const user = await User.findById(userId);
+
+  if (!user) {
+    throw new Error('User not found');
+  }
+  const isAdminCreated = user.role === 'admin';
+
+
   const transformedQuestions = geminiResponse.questions.map(question => {
     // Convert options object to array while preserving order
     const optionsArray = [
@@ -264,6 +279,7 @@ function transformGeminiResponseToQuiz(geminiResponse, userId) {
     source: geminiResponse.source,
     totalQuestions: geminiResponse.totalQuestions,
     createdBy: userId,
+    isAdminCreated: isAdminCreated,
     isPublic: false,
     createdAt: new Date(),
     updatedAt: new Date()
@@ -277,41 +293,6 @@ function transformGeminiResponseToQuiz(geminiResponse, userId) {
   return quizDoc;
 }
 
-function transformGeminiResponseToQuestion(geminiResponse, userId) {
-  // Transform each question to match your schema
-  const transformedQuestions = geminiResponse.questions.map(question => {
-    // Convert options object to array while preserving order
-    const optionsArray = [
-      question.options.a,
-      question.options.b,
-      question.options.c,
-      question.options.d
-    ];
-
-    return {
-      question: question.questionText,
-      options: optionsArray,
-      correctAnswer: optionsArray[['a', 'b', 'c', 'd'].indexOf(question.correctAnswer)],
-      explanation: question.explanation,
-      points: question.points || 10,
-      timeLimit: question.timeLimit
-    };
-  });
-
-  // Create the quiz document
-  const quizDoc = {
-    questions: transformedQuestions,
-    createdBy: userId,
-    updatedAt: new Date()
-  };
-
-  // Validate difficulty
-  if (!['easy', 'medium', 'hard'].includes(quizDoc.difficulty)) {
-    quizDoc.difficulty = 'medium';
-  }
-
-  return quizDoc;
-}
 
 
 module.exports = {
