@@ -243,7 +243,11 @@ class AIService {
    * Checks prompt for inappropriate content
    */
   static async _checkContentSafety(prompt) {
-    const result = await model.generateContent(`Analyze this prompt: "${prompt} as one of: Programming, Science, History, Geography, Sports, Entertainment, Art, Mathematics, or General Other Study Re;ated. Respond ONLY with "SAFE" or "UNSAFE".`);
+    const result = await model.generateContent(
+      `Analyze this prompt: "${prompt}" and respond with "UNSAFE" only if it contains explicit sexual content, pornographic material, or inappropriate adult content. 
+       Normal biological/anatomical terms used in scientific/educational context should be considered "SAFE".
+       Only respond with either "SAFE" or "UNSAFE".`
+    );
     const response = (await result.response).text().trim();
     if (response !== "SAFE") throw new Error("Content violates guidelines");
   }
@@ -364,8 +368,8 @@ class AIService {
       }
 
       // 2. Generate a new question matching the original parameters
-      const prompt = this._buildRefreshPrompt(
-        quiz.topic,
+      const prompt = await this._buildRefreshPrompt(
+        quiz.title,
         quiz.difficulty,
         quiz.questions[questionIndex]
       );
@@ -403,7 +407,15 @@ class AIService {
     }
   }
 
-  static _buildRefreshPrompt(topic, difficulty, originalQuestion) {
+  static async  _buildRefreshPrompt(title, difficulty, originalQuestion) {
+
+    const result = await model.generateContent(
+      `Analyze this title: "${title}" and extract the main title/topic. 
+       Respond only with the topic name in 2-3 words.`
+    );
+
+    const topic = (await result.response).text().trim();
+    
     return `Generate a new ${difficulty} difficulty quiz question about ${topic} to replace this existing question:
     
     Original Question: "${originalQuestion.question}"
