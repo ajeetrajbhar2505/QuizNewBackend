@@ -52,6 +52,7 @@ const getAllQuiz = async (userId) => {
         description: 1,
         isPublic: 1,
         estimatedTime: 1,
+        source : 1,
         approvalStatus: 1,
         _id: 1
       }
@@ -79,6 +80,7 @@ const getPublishedQuiz = async (userId) => {
         category: 1,
         description: 1,
         isPublic: 1,
+        source : 1,
         estimatedTime: 1,
         approvalStatus: 1,
         _id: 1
