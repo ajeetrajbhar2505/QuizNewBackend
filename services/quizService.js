@@ -65,6 +65,75 @@ const getAllQuiz = async (userId) => {
   }
 };
 
+const getActiveQuizes = async (userId) => {
+  try {
+    if (!userId) {
+      throw new Error('User ID is required');
+    }
+
+    const quizzes = await ActiveQuiz.aggregate([
+      {
+        $match: {
+          status: { $in: ['waiting', 'in-progress'] }
+        }
+      },
+      {
+        $lookup: {
+          from: 'quizzes', 
+          localField: 'quiz', 
+          foreignField: '_id', 
+          as: 'quizDetails'
+        }
+      },
+      { $unwind : '$quizDetails'},
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'quizDetails.createdBy', 
+          foreignField: '_id',
+          as: 'creatorDetails'
+        }
+      },
+      { $unwind: '$creatorDetails' },
+      {
+        $addFields: {
+          participantCount: { $size: '$participants' },
+          participants : { $slice: ["$participants", 2]},
+          remainingParticipants: {
+            $cond: [
+              { $gt: [{ $size: "$participants" }, 2] },
+              { $subtract: [{ $size: "$participants" }, 2] },
+              0
+            ]
+          }
+        }
+      },
+      {
+        $project: {
+          status: 1,
+          participants: 1,
+          startedAt: 1,
+          participants: {
+            _id: 1,
+            score: 1, 
+            name: '$creatorDetails.name', 
+            profilePic: '$creatorDetails.avatar', 
+          },
+          participantCount: 1,
+          title: '$quizDetails.title',
+          description: '$quizDetails.description',
+        }
+      }
+    ]).exec();
+
+    return quizzes;
+  } catch (error) {
+    console.error('Error fetching quizzes:', error);
+    throw new Error('Failed to fetch quizzes: ' + error.message);
+  }
+};
+
+
 const getPublishedQuiz = async (userId) => {
   try {
     if (!userId) {
@@ -94,15 +163,6 @@ const getPublishedQuiz = async (userId) => {
   }
 };
 
-
-
-const getQuizById = async (quizId) => {
-  const quiz = await Quiz.findById(quizId).populate('createdBy', 'name avatar');
-  if (!quiz) {
-    throw new Error('Quiz not found');
-  }
-  return quiz;
-};
 
 const deleteQuiz = async (quizId, userId) => {
   const quiz = await Quiz.findOne({
@@ -156,8 +216,26 @@ const publishQuizById = async (quizId, userId, publish, approvalStatus) => {
   }
 };
 
-const startQuiz = async (quizId, userId) => {
+// Helper function to get quiz by ID
+const getQuizById = async (quizId) => {
+  const quiz = await Quiz.findById(quizId);
+  if (!quiz) throw new Error('Quiz not found');
+  return quiz;
+};
+
+// Start waiting period for quiz
+const startWaiting = async (quizId, userId) => {
   const quiz = await getQuizById(quizId);
+  
+  // Check if there's already an active quiz
+  const existingActiveQuiz = await ActiveQuiz.findOne({
+    quiz: quizId,
+    status: { $in: ['waiting', 'in-progress'] }
+  });
+  
+  if (existingActiveQuiz) {
+    throw new Error('Quiz is already active or waiting for participants');
+  }
 
   const activeQuiz = await ActiveQuiz.create({
     quiz: quiz._id,
@@ -167,26 +245,124 @@ const startQuiz = async (quizId, userId) => {
   });
 
   // Join the quiz room
-  getIO().sockets.sockets.forEach(socket => {
-    if (socket.user?.id === userId) {
-      socket.join(`quiz_${quizId}`);
-    }
+  const io = getIO();
+  io.to(`user_${userId}`).socketsJoin(`quiz_${quizId}`);
+
+  return activeQuiz;
+};
+
+// Start the quiz (transition from waiting to in-progress)
+const startQuiz = async (quizId, userId) => {
+  const activeQuiz = await ActiveQuiz.findOneAndUpdate(
+    { 
+      quiz: quizId, 
+      host: userId,
+      status: 'waiting' 
+    },
+    { 
+      status: 'in-progress',
+      startedAt: new Date() 
+    },
+    { new: true }
+  );
+
+  if (!activeQuiz) {
+    throw new Error('No waiting quiz found or you are not the host');
+  }
+
+  // Notify all participants
+  const io = getIO();
+  io.to(`quiz_${quizId}`).emit('quiz:started', { activeQuiz });
+
+  return activeQuiz;
+};
+
+// Join an in-progress quiz
+const joinQuiz = async (quizId, userId) => {
+  const activeQuiz = await ActiveQuiz.findOne({
+    quiz: quizId,
+    status: 'waiting'
+  });
+
+  if (!activeQuiz) {
+    throw new Error('No active quiz found to join');
+  }
+
+  // Check if user is already a participant
+  const isParticipant = activeQuiz.participants.some(p => p.user.equals(userId));
+  if (isParticipant) {
+    throw new Error('You have already joined this quiz');
+  }
+
+  // Add participant
+  activeQuiz.participants.push({
+    user: userId,
+    startedAt: new Date()
+  });
+
+  await activeQuiz.save();
+
+  // Join the quiz room
+  const io = getIO();
+  io.to(`user_${userId}`).socketsJoin(`quiz_${quizId}`);
+
+  // Notify others about new participant
+  io.to(`quiz_${quizId}`).emit('quiz:participant-joined', { 
+    userId,
+    participantCount: activeQuiz.participants.length 
   });
 
   return activeQuiz;
 };
 
+// Submit the quiz (mark as completed)
+const submitQuiz = async (quizId, userId) => {
+  const activeQuiz = await ActiveQuiz.findOneAndUpdate(
+    { 
+      quiz: quizId,
+      host: userId,
+      status: 'in-progress'
+    },
+    {
+      status: 'completed',
+      endedAt: new Date()
+    },
+    { new: true }
+  );
+
+  if (!activeQuiz) {
+    throw new Error('No active quiz found or you are not the host');
+  }
+
+  // Complete all participants' sessions
+  activeQuiz.participants.forEach(participant => {
+    if (!participant.endedAt) {
+      participant.endedAt = new Date();
+    }
+  });
+  await activeQuiz.save();
+
+  // Notify all participants
+  const io = getIO();
+  io.to(`quiz_${quizId}`).emit('quiz:completed', { activeQuiz });
+
+  return activeQuiz;
+};
+
+// Submit an answer to a quiz question
 const submitAnswer = async (quizId, questionId, answer, userId) => {
   const activeQuiz = await ActiveQuiz.findOne({
     quiz: quizId,
-    status: 'in-progress',
+    status: 'in-progress'
   });
+  
   if (!activeQuiz) {
     throw new Error('No active quiz found');
   }
 
-  const quiz = await Quiz.findById(quizId);
-  const question = quiz.questions.id(questionId);
+  const quiz = await Quiz.findById(quizId).populate('questions');
+  const question = quiz.questions.find(q => q._id.equals(questionId));
+  
   if (!question) {
     throw new Error('Question not found');
   }
@@ -194,51 +370,63 @@ const submitAnswer = async (quizId, questionId, answer, userId) => {
   const isCorrect = question.correctAnswer === answer;
   const points = isCorrect ? question.points : 0;
 
-  // Update participant's answer
+  // Find or create participant
   let participant = activeQuiz.participants.find(p => p.user.equals(userId));
   if (!participant) {
-    participant = { user: userId, score: 0, answers: [] };
+    participant = { 
+      user: userId, 
+      score: 0, 
+      answers: [],
+      startedAt: new Date()
+    };
     activeQuiz.participants.push(participant);
   }
 
+  // Check if question was already answered
+  const existingAnswer = participant.answers.find(a => a.question.equals(questionId));
+  if (existingAnswer) {
+    throw new Error('Question already answered');
+  }
+
+  // Update participant's answer and score
   participant.answers.push({
-    questionId,
+    question: questionId,
     answer,
     isCorrect,
-    points,
+    answeredAt: new Date()
   });
-
+  
   participant.score += points;
   await activeQuiz.save();
 
   // Update user stats
-  await updateUserStats(userId, isCorrect);
+  await User.findByIdAndUpdate(userId, {
+    $inc: { 
+      totalPoints: points,
+      quizzesTaken: participant.answers.length === quiz.questions.length ? 1 : 0,
+      correctAnswers: isCorrect ? 1 : 0
+    }
+  });
+
+  // Notify host about answer submission
+  const io = getIO();
+  io.to(`user_${activeQuiz.host}`).emit('quiz:answer-submitted', {
+    userId,
+    questionId,
+    isCorrect,
+    score: participant.score
+  });
 
   return {
     isCorrect,
     points,
+    currentScore: participant.score,
     correctAnswer: question.correctAnswer,
     explanation: question.explanation,
+    questionsRemaining: quiz.questions.length - participant.answers.length
   };
 };
 
-const updateUserStats = async (userId, isCorrect) => {
-  const stats = await UserStats.findOneAndUpdate(
-    { user: userId },
-    {
-      $inc: {
-        totalQuizzes: 1,
-        correctAnswers: isCorrect ? 1 : 0,
-        wrongAnswers: isCorrect ? 0 : 1,
-        points: isCorrect ? 10 : 0,
-      },
-      lastActive: new Date(),
-    },
-    { upsert: true, new: true }
-  );
-
-  return stats;
-};
 
 async function transformGeminiResponseToQuiz(geminiResponse, userId) {
   // Transform each question to match your schema
@@ -324,5 +512,9 @@ module.exports = {
   deleteQuiz,
   publishQuizById,
   refreshQuestion,
-  getPublishedQuiz
+  getPublishedQuiz,
+  submitQuiz,
+  joinQuiz,
+  startWaiting,
+  getActiveQuizes
 };

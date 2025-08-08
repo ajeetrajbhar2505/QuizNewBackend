@@ -45,6 +45,18 @@ const getAllQuiz = async (socket) => {
   }
 };
 
+const getActiveQuizes = async (socket) => {
+  try {
+    const quizes = await quizService.getActiveQuizes(socket.user._id);
+    socket.emit('quiz:active:success', { quizes });
+    logger.info(`Quiz all by user ${socket.user._id}`);
+  } catch (error) {
+    socket.emit('quiz:active:error', { error: error.message });
+    logger.error(`Get quiz error: ${error.message}`);
+  }
+};
+
+
 
 
 const getQuiz = async (socket, quizId) => {
@@ -77,14 +89,47 @@ const publish = async (socket, quizId, publish, approvalStatus) => {
   }
 };
 
+const startWaiting = async (socket, quizId) => {
+  try {
+    const activeQuiz = await quizService.startWaiting(quizId, socket.user._id);
+    socket.emit('quiz:waiting:success', { activeQuiz });
+    logger.info(`Quiz ${quizId} hosted by user ${socket.user._id}`);
+  } catch (error) {
+    socket.emit('quiz:join:error', { error: error.message });
+    logger.error(`Start waiting error: ${error.message}`);
+  }
+};
+
+const joinQuiz = async (socket, quizId) => {
+  try {
+    const activeQuiz = await quizService.joinQuiz(quizId, socket.user._id);
+    socket.emit('quiz:join:success', { activeQuiz });
+    logger.info(`Quiz ${quizId} joined by new user ${socket.user._id}`);
+  } catch (error) {
+    socket.emit('quiz:join:error', { error: error.message });
+    logger.error(`Start join error: ${error.message}`);
+  }
+};
+
 const startQuiz = async (socket, quizId) => {
   try {
     const activeQuiz = await quizService.startQuiz(quizId, socket.user._id);
-    socket.to(`quiz_${quizId}`).emit('quiz:start:success', { activeQuiz });
-    logger.info(`Quiz ${quizId} started by user ${socket.user._id}`);
+    socket.emit('quiz:start:success', { activeQuiz });
+    logger.info(`Quiz ${quizId} start by new user ${socket.user._id}`);
+  } catch (error) {
+    socket.emit('quiz:join:error', { error: error.message });
+    logger.error(`Start join error: ${error.message}`);
+  }
+};
+
+const submitQuiz = async (socket, quizId) => {
+  try {
+    const activeQuiz = await quizService.submitQuiz(quizId, socket.user._id);
+    socket.to(`quiz_${quizId}`).emit('quiz:submit:success', { activeQuiz });
+    logger.info(`Quiz ${quizId} submitted by user ${socket.user._id}`);
   } catch (error) {
     socket.emit('quiz:start:error', { error: error.message });
-    logger.error(`Start quiz error: ${error.message}`);
+    logger.error(`Submit quiz error: ${error.message}`);
   }
 };
 
@@ -113,5 +158,9 @@ module.exports = {
   publish,
   deleteQuiz,
   refreshQuestion,
-  getPublishedQuiz
+  getPublishedQuiz,
+  submitQuiz,
+  joinQuiz,
+  startWaiting,
+  getActiveQuizes
 };
