@@ -44,15 +44,23 @@ const getUserStats = async (userId) => {
 };
 
 
-const getLeaderboardUser = async () => {
+const getLeaderboardUser = async (limit) => {
   try {
-    const topStats = await UserStats.aggregate([
+
+    const pipeline = [
       { 
         $sort: { points: -1 } 
-      },
-      { 
-        $limit: 3 
-      },
+      }
+    ];
+
+    if (limit > 0) {
+      pipeline.push({ 
+        $limit: limit
+      });
+    }
+
+
+    pipeline.push(
       {
         $lookup: { 
           from: 'users',
@@ -74,9 +82,11 @@ const getLeaderboardUser = async () => {
           streak: '$streak.current'
         }
       }
-    ]);
+    );
 
+    const topStats = await UserStats.aggregate(pipeline);
     return topStats
+    
   } catch (error) {
     console.error('Error fetching leadership board:', error);
     throw new Error('Failed to retrieve leadership data');

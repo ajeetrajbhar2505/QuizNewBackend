@@ -21,9 +21,9 @@ const getRecentActivity = async (socket) => {
   }
 };
 
-const getLeaderboardUser = async (socket) => {
+const getLeaderboardUser = async (socket,limit) => {
   try {
-    const leaderboard = await dashboardService.getLeaderboardUser();
+    const leaderboard = await dashboardService.getLeaderboardUser(limit);
     socket.emit('dashboard:leaderboardUser:success', { leaderboard });
   } catch (error) {
     socket.emit('dashboard:leaderboardUser:error', { error: error.message });
