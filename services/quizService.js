@@ -42,7 +42,7 @@ const getAllQuiz = async (userId) => {
 
     const quizzes = await Quiz.find(
       {
-        createdBy: userId 
+        createdBy: userId
       },
       {
         difficulty: 1,
@@ -52,7 +52,7 @@ const getAllQuiz = async (userId) => {
         description: 1,
         isPublic: 1,
         estimatedTime: 1,
-        source : 1,
+        source: 1,
         approvalStatus: 1,
         _id: 1
       }
@@ -65,13 +65,13 @@ const getAllQuiz = async (userId) => {
   }
 };
 
-const getActiveQuizes = async (userId) => {
+const getActiveQuizes = async (userId, limit) => {
   try {
     if (!userId) {
       throw new Error('User ID is required');
     }
 
-    const quizzes = await ActiveQuiz.aggregate([
+    const pipeline = [
       {
         $match: {
           status: { $in: ['waiting', 'in-progress'] }
@@ -79,17 +79,17 @@ const getActiveQuizes = async (userId) => {
       },
       {
         $lookup: {
-          from: 'quizzes', 
-          localField: 'quiz', 
-          foreignField: '_id', 
+          from: 'quizzes',
+          localField: 'quiz',
+          foreignField: '_id',
           as: 'quizDetails'
         }
       },
-      { $unwind : '$quizDetails'},
+      { $unwind: '$quizDetails' },
       {
         $lookup: {
           from: 'users',
-          localField: 'quizDetails.createdBy', 
+          localField: 'quizDetails.createdBy',
           foreignField: '_id',
           as: 'creatorDetails'
         }
@@ -98,7 +98,7 @@ const getActiveQuizes = async (userId) => {
       {
         $addFields: {
           participantCount: { $size: '$participants' },
-          participants : { $slice: ["$participants", 2]},
+          participants: { $slice: ["$participants", 2] },
           remainingParticipants: {
             $cond: [
               { $gt: [{ $size: "$participants" }, 2] },
@@ -115,32 +115,38 @@ const getActiveQuizes = async (userId) => {
           startedAt: 1,
           participants: {
             _id: 1,
-            score: 1, 
-            name: '$creatorDetails.name', 
-            profilePic: '$creatorDetails.avatar', 
+            score: 1,
+            name: '$creatorDetails.name',
+            profilePic: '$creatorDetails.avatar',
           },
           participantCount: 1,
           title: '$quizDetails.title',
           description: '$quizDetails.description',
         }
       }
-    ]).exec();
+    ];
 
+    // Add $limit stage only if limit > 0
+    if (limit > 0) {
+      pipeline.push({ $limit: limit });
+    }
+
+    const quizzes = await ActiveQuiz.aggregate(pipeline).exec();
     return quizzes;
   } catch (error) {
-    console.error('Error fetching quizzes:', error);
-    throw new Error('Failed to fetch quizzes: ' + error.message);
+    console.error('Error fetching active quizzes:', error);
+    throw new Error('Failed to fetch active quizzes: ' + error.message);
   }
 };
 
-
-const getPublishedQuiz = async (userId) => {
+const getPublishedQuiz = async (userId, limit) => {
   try {
     if (!userId) {
       throw new Error('User ID is required');
     }
 
-    const quizzes = await Quiz.find(
+    // Base query for public quizzes
+    const query = Quiz.find(
       { isPublic: true },
       {
         difficulty: 1,
@@ -149,20 +155,26 @@ const getPublishedQuiz = async (userId) => {
         category: 1,
         description: 1,
         isPublic: 1,
-        source : 1,
+        source: 1,
         estimatedTime: 1,
         approvalStatus: 1,
         _id: 1
       }
-    ).lean().exec();
+    ).lean();
 
-    return quizzes
+    // Only apply limit if it's greater than 0
+    if (limit > 0) {
+      query.limit(limit);
+    }
+
+    // Execute the query
+    const quizzes = await query.exec();
+    return quizzes;
   } catch (error) {
     console.error('Error fetching quizzes:', error);
     throw new Error('Failed to fetch quizzes: ' + error.message);
   }
 };
-
 
 const deleteQuiz = async (quizId, userId) => {
   const quiz = await Quiz.findOne({
@@ -226,13 +238,13 @@ const getQuizById = async (quizId) => {
 // Start waiting period for quiz
 const startWaiting = async (quizId, userId) => {
   const quiz = await getQuizById(quizId);
-  
+
   // Check if there's already an active quiz
   const existingActiveQuiz = await ActiveQuiz.findOne({
     quiz: quizId,
     status: { $in: ['waiting', 'in-progress'] }
   });
-  
+
   if (existingActiveQuiz) {
     throw new Error('Quiz is already active or waiting for participants');
   }
@@ -254,14 +266,14 @@ const startWaiting = async (quizId, userId) => {
 // Start the quiz (transition from waiting to in-progress)
 const startQuiz = async (quizId, userId) => {
   const activeQuiz = await ActiveQuiz.findOneAndUpdate(
-    { 
-      quiz: quizId, 
+    {
+      quiz: quizId,
       host: userId,
-      status: 'waiting' 
+      status: 'waiting'
     },
-    { 
+    {
       status: 'in-progress',
-      startedAt: new Date() 
+      startedAt: new Date()
     },
     { new: true }
   );
@@ -307,9 +319,9 @@ const joinQuiz = async (quizId, userId) => {
   io.to(`user_${userId}`).socketsJoin(`quiz_${quizId}`);
 
   // Notify others about new participant
-  io.to(`quiz_${quizId}`).emit('quiz:participant-joined', { 
+  io.to(`quiz_${quizId}`).emit('quiz:participant-joined', {
     userId,
-    participantCount: activeQuiz.participants.length 
+    participantCount: activeQuiz.participants.length
   });
 
   return activeQuiz;
@@ -318,7 +330,7 @@ const joinQuiz = async (quizId, userId) => {
 // Submit the quiz (mark as completed)
 const submitQuiz = async (quizId, userId) => {
   const activeQuiz = await ActiveQuiz.findOneAndUpdate(
-    { 
+    {
       quiz: quizId,
       host: userId,
       status: 'in-progress'
@@ -355,14 +367,14 @@ const submitAnswer = async (quizId, questionId, answer, userId) => {
     quiz: quizId,
     status: 'in-progress'
   });
-  
+
   if (!activeQuiz) {
     throw new Error('No active quiz found');
   }
 
   const quiz = await Quiz.findById(quizId).populate('questions');
   const question = quiz.questions.find(q => q._id.equals(questionId));
-  
+
   if (!question) {
     throw new Error('Question not found');
   }
@@ -373,9 +385,9 @@ const submitAnswer = async (quizId, questionId, answer, userId) => {
   // Find or create participant
   let participant = activeQuiz.participants.find(p => p.user.equals(userId));
   if (!participant) {
-    participant = { 
-      user: userId, 
-      score: 0, 
+    participant = {
+      user: userId,
+      score: 0,
       answers: [],
       startedAt: new Date()
     };
@@ -395,13 +407,13 @@ const submitAnswer = async (quizId, questionId, answer, userId) => {
     isCorrect,
     answeredAt: new Date()
   });
-  
+
   participant.score += points;
   await activeQuiz.save();
 
   // Update user stats
   await User.findByIdAndUpdate(userId, {
-    $inc: { 
+    $inc: {
       totalPoints: points,
       quizzesTaken: participant.answers.length === quiz.questions.length ? 1 : 0,
       correctAnswers: isCorrect ? 1 : 0

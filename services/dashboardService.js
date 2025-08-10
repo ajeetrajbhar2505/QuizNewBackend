@@ -44,7 +44,7 @@ const getUserStats = async (userId) => {
 };
 
 
-const getLeaderboardUser = async (limit) => {
+const getLeaderboardUser = async (limit = 0) => {
   try {
 
     const pipeline = [

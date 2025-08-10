@@ -23,9 +23,9 @@ const refreshQuestion = async (socket, quizId,questionIndex) => {
   }
 };
 
-const getPublishedQuiz = async (socket) => {
+const getPublishedQuiz = async (socket,limit) => {
   try {
-    const quizes = await quizService.getPublishedQuiz(socket.user._id);
+    const quizes = await quizService.getPublishedQuiz(socket.user._id,limit);
     socket.emit('quiz:published:success', { quizes });
     logger.info(`Quiz all by user ${socket.user._id}`);
   } catch (error) {
@@ -45,9 +45,9 @@ const getAllQuiz = async (socket) => {
   }
 };
 
-const getActiveQuizes = async (socket) => {
+const getActiveQuizes = async (socket,limit) => {
   try {
-    const quizes = await quizService.getActiveQuizes(socket.user._id);
+    const quizes = await quizService.getActiveQuizes(socket.user._id,limit);
     socket.emit('quiz:active:success', { quizes });
     logger.info(`Quiz all by user ${socket.user._id}`);
   } catch (error) {
