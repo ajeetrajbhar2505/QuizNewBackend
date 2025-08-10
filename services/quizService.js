@@ -113,6 +113,9 @@ const getActiveQuizes = async (userId, limit) => {
           status: 1,
           participants: 1,
           startedAt: 1,
+          estimatedTime:'$quizDetails.estimatedTime',
+          difficulty:'$quizDetails.difficulty',
+          totalQuestions:'$quizDetails.totalQuestions',
           participants: {
             _id: 1,
             score: 1,
