@@ -53,6 +53,7 @@ const logout = async (socket,userId) => {
     if (userId) {
       await authService.logoutUser(userId);
       socket.emit('auth:logout:success'); 
+      socket.leave(`user_${socket.id}`);
       logger.info(`User logged out: ${userId}`);
     }
   } catch (error) {

@@ -17,6 +17,8 @@ const initSocket = (server) => {
   // Handle unauthenticated connections first
   io.on('connection', (socket) => {
     logger.info(`New client connected: ${socket.id}`);
+    socket.join(`user_${socket.id}`);
+
     
     // Register unauthenticated handlers
     socket.on('auth:register', (data) => authController.register(socket, data));
