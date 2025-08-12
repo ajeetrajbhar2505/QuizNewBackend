@@ -1,5 +1,6 @@
 const quizService = require('../services/quizService');
 const logger = require('../config/logger');
+const { getIO } = require('../config/socket');
 
 const createQuiz = async (socket, data) => {
   try {
@@ -83,6 +84,7 @@ const publish = async (socket, quizId, publish, approvalStatus) => {
   try {
     const quiz = await quizService.publishQuizById(quizId, socket.user._id, publish, approvalStatus);
     socket.emit('quiz:publish:success', { quiz });
+    getIO().emit('refreshpage');
   } catch (error) {
     socket.emit('quiz:publish:error', { error: error.message });
     logger.error(`Get quiz error: ${error.message}`);
@@ -93,6 +95,7 @@ const startWaiting = async (socket, quizId) => {
   try {
     const activeQuiz = await quizService.startWaiting(quizId, socket.user._id);
     socket.emit('quiz:waiting:success', { activeQuiz });
+    getIO().emit('refreshpage');
     logger.info(`Quiz ${quizId} hosted by user ${socket.user._id}`);
   } catch (error) {
     socket.emit('quiz:waiting:error', { error: error.message });
@@ -104,6 +107,7 @@ const joinQuiz = async (socket, quizId) => {
   try {
     const activeQuiz = await quizService.joinQuiz(quizId, socket.user._id);
     socket.emit('quiz:join:success', { activeQuiz });
+    getIO().emit('refreshpage');
     logger.info(`Quiz ${quizId} joined by new user ${socket.user._id}`);
   } catch (error) {
     socket.emit('quiz:join:error', { error: error.message });
@@ -115,6 +119,7 @@ const startQuiz = async (socket, quizId) => {
   try {
     const activeQuiz = await quizService.startQuiz(quizId, socket.user._id);
     socket.emit('quiz:start:success', { activeQuiz });
+    getIO().emit('refreshpage');
     logger.info(`Quiz ${quizId} start by new user ${socket.user._id}`);
   } catch (error) {
     socket.emit('quiz:start:error', { error: error.message });
@@ -126,6 +131,7 @@ const submitQuiz = async (socket, quizId) => {
   try {
     const activeQuiz = await quizService.submitQuiz(quizId, socket.user._id);
     socket.emit('quiz:submit:success', { activeQuiz });
+    getIO().emit('refreshpage');
     logger.info(`Quiz ${quizId} submitted by user ${socket.user._id}`);
   } catch (error) {
     socket.emit('quiz:submit:error', { error: error.message });
@@ -142,6 +148,7 @@ const submitAnswer = async (socket, { quizId, questionId, answer }) => {
       socket.user._id
     );
     socket.emit('quiz:answer:success', { result });
+    getIO().emit('refreshpage');
     logger.info(`Answer submitted by user ${socket.user._id}`);
   } catch (error) {
     socket.emit('quiz:answer:error', { error: error.message });
