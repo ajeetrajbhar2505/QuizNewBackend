@@ -89,42 +89,99 @@ const getActiveQuizes = async (userId, limit) => {
       {
         $lookup: {
           from: 'users',
-          localField: 'quizDetails.createdBy',
+          localField: 'host',
           foreignField: '_id',
-          as: 'creatorDetails'
+          as: 'hostDetails'
         }
       },
-      { $unwind: '$creatorDetails' },
+      { $unwind: '$hostDetails' },
+      {
+        $lookup: {
+          from: 'users',
+          let: { participantUsers: '$participants.user' },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $in: ['$_id', '$$participantUsers'] }
+              }
+            },
+            {
+              $project: {
+                _id: 1,
+                name: 1,
+                avatar: 1,
+                email: 1
+              }
+            }
+          ],
+          as: 'participantUserDetails'
+        }
+      },
       {
         $addFields: {
           participantCount: { $size: '$participants' },
-          participants: { $slice: ["$participants", 2] },
           remainingParticipants: {
             $cond: [
               { $gt: [{ $size: "$participants" }, 2] },
               { $subtract: [{ $size: "$participants" }, 2] },
               0
             ]
+          },
+          mergedParticipants: {
+            $map: {
+              input: { $slice: ["$participants", 2] },
+              as: "p",
+              in: {
+                $mergeObjects: [
+                  "$$p",
+                  {
+                    $let: {
+                      vars: {
+                        userData: {
+                          $arrayElemAt: [
+                            {
+                              $filter: {
+                                input: "$participantUserDetails",
+                                as: "u",
+                                cond: { $eq: ["$$u._id", "$$p.user"] }
+                              }
+                            },
+                            0
+                          ]
+                        }
+                      },
+                      in: {
+                        userName: "$$userData.name",
+                        userAvatar: "$$userData.avatar",
+                        userEmail: "$$userData.email"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
           }
         }
       },
       {
         $project: {
           status: 1,
-          participants: 1,
+          participants: "$mergedParticipants",
+          remainingParticipants: 1,
           startedAt: 1,
-          estimatedTime:'$quizDetails.estimatedTime',
-          difficulty:'$quizDetails.difficulty',
-          totalQuestions:'$quizDetails.totalQuestions',
-          participants: {
-            _id: 1,
-            score: 1,
-            name: '$creatorDetails.name',
-            profilePic: '$creatorDetails.avatar',
-          },
+          estimatedTime: '$quizDetails.estimatedTime',
+          difficulty: '$quizDetails.difficulty',
+          totalQuestions: '$quizDetails.totalQuestions',
           participantCount: 1,
           title: '$quizDetails.title',
           description: '$quizDetails.description',
+          quizId: '$quizDetails._id',
+          host: {
+            _id: '$hostDetails._id',
+            name: '$hostDetails.name',
+            avatar: '$hostDetails.avatar',
+            email: '$hostDetails.email'
+          }
         }
       }
     ];

@@ -95,7 +95,7 @@ const startWaiting = async (socket, quizId) => {
     socket.emit('quiz:waiting:success', { activeQuiz });
     logger.info(`Quiz ${quizId} hosted by user ${socket.user._id}`);
   } catch (error) {
-    socket.emit('quiz:join:error', { error: error.message });
+    socket.emit('quiz:waiting:error', { error: error.message });
     logger.error(`Start waiting error: ${error.message}`);
   }
 };
@@ -117,7 +117,7 @@ const startQuiz = async (socket, quizId) => {
     socket.emit('quiz:start:success', { activeQuiz });
     logger.info(`Quiz ${quizId} start by new user ${socket.user._id}`);
   } catch (error) {
-    socket.emit('quiz:join:error', { error: error.message });
+    socket.emit('quiz:start:error', { error: error.message });
     logger.error(`Start join error: ${error.message}`);
   }
 };
@@ -125,10 +125,10 @@ const startQuiz = async (socket, quizId) => {
 const submitQuiz = async (socket, quizId) => {
   try {
     const activeQuiz = await quizService.submitQuiz(quizId, socket.user._id);
-    socket.to(`quiz_${quizId}`).emit('quiz:submit:success', { activeQuiz });
+    socket.emit('quiz:submit:success', { activeQuiz });
     logger.info(`Quiz ${quizId} submitted by user ${socket.user._id}`);
   } catch (error) {
-    socket.emit('quiz:start:error', { error: error.message });
+    socket.emit('quiz:submit:error', { error: error.message });
     logger.error(`Submit quiz error: ${error.message}`);
   }
 };

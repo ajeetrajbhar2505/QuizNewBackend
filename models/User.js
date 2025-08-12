@@ -17,7 +17,7 @@ const userSchema = new mongoose.Schema({
     ipAddress: String,
     userAgent: String
   }],
-  role: { type: String, enum: ['user', 'admin'], default: 'user' },
+  role: { type: String, enum: ['user', 'admin','tutor'], default: 'user' },
   friends: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
   badges: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Badge' }],
   createdAt: { type: Date, default: Date.now },
