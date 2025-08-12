@@ -11,6 +11,7 @@ const setupQuizRoutes = (socket) => {
   socket.on('quiz:waiting', (quizId) => quizController.startWaiting(socket, quizId));
   socket.on('quiz:join', (quizId) => quizController.joinQuiz(socket, quizId));
   socket.on('quiz:start', (quizId) => quizController.startQuiz(socket, quizId));
+  socket.on('quiz:participants', (quizId) => quizController.getParticipants(socket, quizId));
   socket.on('quiz:delete', (quizId) => quizController.deleteQuiz(socket, quizId));
   socket.on('quiz:answer:submit', (data) => quizController.submitAnswer(socket, data));
   socket.on('quiz:submit', (data) => quizController.submitQuiz(socket, data));

@@ -1,10 +1,9 @@
 const Quiz = require('../models/Quiz');
 const User = require('../models/User');
 const ActiveQuiz = require('../models/ActiveQuiz');
-const UserStats = require('../models/UserStats');
-const logger = require('../config/logger');
 const { getIO } = require('../config/socket');
 const AimlQuizService = require('./openai.service');
+const { ObjectId } = require('mongoose').Types;
 
 const createQuiz = async (data, userId) => {
   const geminiResponse = await AimlQuizService.generateQuiz(data.prompt);
@@ -96,77 +95,13 @@ const getActiveQuizes = async (userId, limit) => {
       },
       { $unwind: '$hostDetails' },
       {
-        $lookup: {
-          from: 'users',
-          let: { participantUsers: '$participants.user' },
-          pipeline: [
-            {
-              $match: {
-                $expr: { $in: ['$_id', '$$participantUsers'] }
-              }
-            },
-            {
-              $project: {
-                _id: 1,
-                name: 1,
-                avatar: 1,
-                email: 1
-              }
-            }
-          ],
-          as: 'participantUserDetails'
-        }
-      },
-      {
         $addFields: {
           participantCount: { $size: '$participants' },
-          remainingParticipants: {
-            $cond: [
-              { $gt: [{ $size: "$participants" }, 2] },
-              { $subtract: [{ $size: "$participants" }, 2] },
-              0
-            ]
-          },
-          mergedParticipants: {
-            $map: {
-              input: { $slice: ["$participants", 2] },
-              as: "p",
-              in: {
-                $mergeObjects: [
-                  "$$p",
-                  {
-                    $let: {
-                      vars: {
-                        userData: {
-                          $arrayElemAt: [
-                            {
-                              $filter: {
-                                input: "$participantUserDetails",
-                                as: "u",
-                                cond: { $eq: ["$$u._id", "$$p.user"] }
-                              }
-                            },
-                            0
-                          ]
-                        }
-                      },
-                      in: {
-                        userName: "$$userData.name",
-                        userAvatar: "$$userData.avatar",
-                        userEmail: "$$userData.email"
-                      }
-                    }
-                  }
-                ]
-              }
-            }
-          }
         }
       },
       {
         $project: {
           status: 1,
-          participants: "$mergedParticipants",
           remainingParticipants: 1,
           startedAt: 1,
           estimatedTime: '$quizDetails.estimatedTime',
@@ -198,6 +133,109 @@ const getActiveQuizes = async (userId, limit) => {
     throw new Error('Failed to fetch active quizzes: ' + error.message);
   }
 };
+
+
+
+const getParticipants = async (quizId) => {
+  try {
+    const pipeline = [
+      {
+        $match: {
+          quiz: new ObjectId(quizId) 
+        }
+      },
+     
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'host',
+          foreignField: '_id',
+          as: 'hostDetails'
+        }
+      },
+      { $unwind: '$hostDetails' },
+     
+      {
+        $lookup: {
+          from: 'users',
+          let: { participantIds: '$participants.user' },
+          pipeline: [
+            {
+              $match: {
+                $expr: { $in: ['$_id', '$$participantIds'] }
+              }
+            },
+            {
+              $project: {
+                _id: 1,
+                name: 1,
+                avatar: 1,
+                email: 1
+              }
+            }
+          ],
+          as: 'participantDetails'
+        }
+      },
+      {
+        $addFields: {
+          participants: {
+            $map: {
+              input: "$participants",
+              as: "participant",
+              in: {
+                $mergeObjects: [
+                  "$$participant",
+                  {
+                    $arrayElemAt: [
+                      {
+                        $filter: {
+                          input: "$participantDetails",
+                          as: "user",
+                          cond: { $eq: ["$$user._id", "$$participant.user"] }
+                        }
+                      },
+                      0
+                    ]
+                  }
+                ]
+              }
+            }
+          },
+          participantCount: { $size: "$participants" }
+        }
+      },
+      {
+        $project: {
+          status: 1,
+          participants: "$mergedParticipants",
+          remainingParticipants: 1,
+          startedAt: 1,
+          estimatedTime: '$quizDetails.estimatedTime',
+          difficulty: '$quizDetails.difficulty',
+          totalQuestions: '$quizDetails.totalQuestions',
+          participantCount: 1,
+          title: '$quizDetails.title',
+          description: '$quizDetails.description',
+          quizId: '$quizDetails._id',
+          host: {
+            _id: '$hostDetails._id',
+            name: '$hostDetails.name',
+            avatar: '$hostDetails.avatar',
+            email: '$hostDetails.email'
+          }
+        }
+      }
+    ];
+
+    const quiz = await ActiveQuiz.aggregate(pipeline).exec();
+    return quiz;
+  } catch (error) {
+    console.error('Error fetching participants:', error);
+    throw new Error('Failed to fetch participants: ' + error.message);
+  }
+};
+
 
 const getPublishedQuiz = async (userId, limit) => {
   try {
@@ -588,5 +626,6 @@ module.exports = {
   submitQuiz,
   joinQuiz,
   startWaiting,
-  getActiveQuizes
+  getActiveQuizes,
+  getParticipants
 };

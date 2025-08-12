@@ -57,6 +57,17 @@ const getActiveQuizes = async (socket,limit) => {
   }
 };
 
+const getParticipants = async (socket,quizId) => {
+  try {
+    const quiz = await quizService.getParticipants(quizId);
+    socket.emit('quiz:participants:success', { quiz });
+    logger.info(`Participants in quiz ${quizId}`);
+  } catch (error) {
+    socket.emit('quiz:participants:error', { error: error.message });
+    logger.error(`Get participants error: ${error.message}`);
+  }
+};
+
 
 
 
@@ -169,5 +180,6 @@ module.exports = {
   submitQuiz,
   joinQuiz,
   startWaiting,
-  getActiveQuizes
+  getActiveQuizes,
+  getParticipants
 };
