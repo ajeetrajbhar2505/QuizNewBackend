@@ -119,21 +119,21 @@ const loginWithOtp = async (email) => {
         </p>
         
         <div style="border-top: 1px solid #e9ecef; padding-top: 20px; margin-top: 20px;">
-          <p style="font-size: 14px; color: #7f8c8d; margin-bottom: 5px;">Need help?</p>
-          <p style="font-size: 14px; margin: 0;">
-            Contact our support team at 
-            <a href="mailto:ajit.career@gmail.com" style="color: #3498db; text-decoration: none;">support@yourcompany.com</a>
-          </p>
-        </div>
-      </div>
-      
-      <div style="text-align: center; padding: 20px 0; font-size: 12px; color: #95a5a6;">
-        <p style="margin: 5px 0;">© ${new Date().getFullYear()} Your Company Name. All rights reserved.</p>
-        <p style="margin: 5px 0;">
-          <a href="https://quiznewbackend.onrender.com/privacy" style="color: #95a5a6; text-decoration: none; margin: 0 10px;">Privacy Policy</a>
-          <a href="https://quiznewbackend.onrender.com/terms" style="color: #95a5a6; text-decoration: none; margin: 0 10px;">Terms of Service</a>
+        <p style="font-size: 14px; color: #7f8c8d; margin-bottom: 5px;">Need help?</p>
+        <p style="font-size: 14px; margin: 0;">
+          Contact our support team at 
+          <a href="mailto:ajit.career@gmail.com" style="color: #3498db; text-decoration: none;">support@ajit.career@gmail.com</a>
         </p>
       </div>
+    </div>
+    
+    <div style="text-align: center; padding: 20px 0; font-size: 12px; color: #95a5a6;">
+      <p style="margin: 5px 0;">© ${new Date().getFullYear()} Quiz Game pvt. All rights reserved.</p>
+      <p style="margin: 5px 0;">
+        <a href="https://quiznewbackend.onrender.com/privacy" style="color: #95a5a6; text-decoration: none; margin: 0 10px;">Privacy Policy</a>
+        <a href="https://quiznewbackend.onrender.com/terms" style="color: #95a5a6; text-decoration: none; margin: 0 10px;">Terms of Service</a>
+      </p>
+    </div>
     </div>
       `
     });
@@ -649,13 +649,13 @@ const sendOtp = async (email) => {
     <p style="font-size: 14px; color: #7f8c8d; margin-bottom: 5px;">Need help?</p>
     <p style="font-size: 14px; margin: 0;">
       Contact our support team at 
-      <a href="mailto:ajit.career@gmail.com" style="color: #3498db; text-decoration: none;">support@yourcompany.com</a>
+      <a href="mailto:ajit.career@gmail.com" style="color: #3498db; text-decoration: none;">support@ajit.career@gmail.com</a>
     </p>
   </div>
 </div>
 
 <div style="text-align: center; padding: 20px 0; font-size: 12px; color: #95a5a6;">
-  <p style="margin: 5px 0;">© ${new Date().getFullYear()} Your Company Name. All rights reserved.</p>
+  <p style="margin: 5px 0;">© ${new Date().getFullYear()} Quiz Game pvt. All rights reserved.</p>
   <p style="margin: 5px 0;">
     <a href="https://quiznewbackend.onrender.com/privacy" style="color: #95a5a6; text-decoration: none; margin: 0 10px;">Privacy Policy</a>
     <a href="https://quiznewbackend.onrender.com/terms" style="color: #95a5a6; text-decoration: none; margin: 0 10px;">Terms of Service</a>
