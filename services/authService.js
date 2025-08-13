@@ -100,7 +100,7 @@ const loginWithOtp = async (email) => {
 
       <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333333; line-height: 1.6;">
       <div style="background-color: #f8f9fa; padding: 30px; border-radius: 8px 8px 0 0; text-align: center;">
-        <img src="https://quiznewbackend.onrender.com/quiz-game-logo.png" alt="Company Logo" style="max-height: 50px; margin-bottom: 20px;">
+        <img src="https://quiznewbackend.onrender.com/quiz-game-logo.jpg" alt="Company Logo" style="max-height: 50px; margin-bottom: 20px;">
         <h1 style="color: #2c3e50; margin: 0; font-size: 24px;">Your One-Time Password</h1>
       </div>
       
@@ -627,7 +627,7 @@ const sendOtp = async (email) => {
 
 <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333333; line-height: 1.6;">
 <div style="background-color: #f8f9fa; padding: 30px; border-radius: 8px 8px 0 0; text-align: center;">
-  <img src="https://quiznewbackend.onrender.com/quiz-game-logo.png" alt="Company Logo" style="max-height: 50px; margin-bottom: 20px;">
+  <img src="https://quiznewbackend.onrender.com/quiz-game-logo.jpg" alt="Company Logo" style="max-height: 50px; margin-bottom: 20px;">
   <h1 style="color: #2c3e50; margin: 0; font-size: 24px;">Your One-Time Password</h1>
 </div>
 
