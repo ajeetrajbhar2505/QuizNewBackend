@@ -96,15 +96,45 @@ const loginWithOtp = async (email) => {
       to: email,
       subject: 'Quiz App OTP Code',
       html: `
-      <div style="font-family: Arial, sans-serif; color: #333;">
-        <h2 style="color: #4CAF50;">Hello ${user.name || 'User'},</h2>
-        <p style="font-size: 16px;">Your OTP code is: <strong style="font-size: 20px; color: #FF5722;">${otp}</strong></p>
-        <p style="font-size: 16px;">This code is valid for the next <strong>5 minutes</strong>.</p>
-        <p style="font-size: 16px;">If you did not request this code, please ignore this message.</p>
-        <br>
-        <p style="font-size: 16px; color: #999;">Best regards,</p>
-        <p style="font-size: 16px; color: #999;">Your App Team</p>
+
+
+      <div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333333; line-height: 1.6;">
+      <div style="background-color: #f8f9fa; padding: 30px; border-radius: 8px 8px 0 0; text-align: center;">
+        <img src="https://quiznewbackend.onrender.com/quiz-game-logo.png" alt="Company Logo" style="max-height: 50px; margin-bottom: 20px;">
+        <h1 style="color: #2c3e50; margin: 0; font-size: 24px;">Your One-Time Password</h1>
       </div>
+      
+      <div style="padding: 30px; background-color: #ffffff; border-radius: 0 0 8px 8px; border: 1px solid #e9ecef;">
+        <p style="font-size: 16px; margin-bottom: 20px;">Hello ${user.name || 'Valued Customer'},</p>
+        
+        <p style="font-size: 16px; margin-bottom: 25px;">Please use the following One-Time Password to verify your identity:</p>
+        
+        <div style="background-color: #f1f8fe; border: 1px dashed #3498db; padding: 20px; text-align: center; margin: 20px 0; border-radius: 6px;">
+          <div style="font-size: 28px; font-weight: bold; letter-spacing: 3px; color: #2c3e50;">${otp}</div>
+        </div>
+        
+        <p style="font-size: 14px; color: #7f8c8d; margin-bottom: 25px;">
+          <strong>Note:</strong> This code expires in <span style="color: #e74c3c;">5 minutes</span>. 
+          Do not share this code with anyone.
+        </p>
+        
+        <div style="border-top: 1px solid #e9ecef; padding-top: 20px; margin-top: 20px;">
+          <p style="font-size: 14px; color: #7f8c8d; margin-bottom: 5px;">Need help?</p>
+          <p style="font-size: 14px; margin: 0;">
+            Contact our support team at 
+            <a href="mailto:ajit.career@gmail.com" style="color: #3498db; text-decoration: none;">support@yourcompany.com</a>
+          </p>
+        </div>
+      </div>
+      
+      <div style="text-align: center; padding: 20px 0; font-size: 12px; color: #95a5a6;">
+        <p style="margin: 5px 0;">© ${new Date().getFullYear()} Your Company Name. All rights reserved.</p>
+        <p style="margin: 5px 0;">
+          <a href="https://quiznewbackend.onrender.com/privacy" style="color: #95a5a6; text-decoration: none; margin: 0 10px;">Privacy Policy</a>
+          <a href="https://quiznewbackend.onrender.com/terms" style="color: #95a5a6; text-decoration: none; margin: 0 10px;">Terms of Service</a>
+        </p>
+      </div>
+    </div>
       `
     });
 
@@ -593,15 +623,45 @@ const sendOtp = async (email) => {
       to: email,
       subject: 'Quiz App OTP Code',
       html: `
-      <div style="font-family: Arial, sans-serif; color: #333;">
-        <h2 style="color: #4CAF50;">Hello ${user.name || 'User'},</h2>
-        <p style="font-size: 16px;">Your OTP code is: <strong style="font-size: 20px; color: #FF5722;">${otp}</strong></p>
-        <p style="font-size: 16px;">This code is valid for the next <strong>5 minutes</strong>.</p>
-        <p style="font-size: 16px;">If you did not request this code, please ignore this message.</p>
-        <br>
-        <p style="font-size: 16px; color: #999;">Best regards,</p>
-        <p style="font-size: 16px; color: #999;">Your App Team</p>
-      </div>
+   
+
+<div style="font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333333; line-height: 1.6;">
+<div style="background-color: #f8f9fa; padding: 30px; border-radius: 8px 8px 0 0; text-align: center;">
+  <img src="https://quiznewbackend.onrender.com/quiz-game-logo.png" alt="Company Logo" style="max-height: 50px; margin-bottom: 20px;">
+  <h1 style="color: #2c3e50; margin: 0; font-size: 24px;">Your One-Time Password</h1>
+</div>
+
+<div style="padding: 30px; background-color: #ffffff; border-radius: 0 0 8px 8px; border: 1px solid #e9ecef;">
+  <p style="font-size: 16px; margin-bottom: 20px;">Hello ${user.name || 'Valued Customer'},</p>
+  
+  <p style="font-size: 16px; margin-bottom: 25px;">Please use the following One-Time Password to verify your identity:</p>
+  
+  <div style="background-color: #f1f8fe; border: 1px dashed #3498db; padding: 20px; text-align: center; margin: 20px 0; border-radius: 6px;">
+    <div style="font-size: 28px; font-weight: bold; letter-spacing: 3px; color: #2c3e50;">${otp}</div>
+  </div>
+  
+  <p style="font-size: 14px; color: #7f8c8d; margin-bottom: 25px;">
+    <strong>Note:</strong> This code expires in <span style="color: #e74c3c;">5 minutes</span>. 
+    Do not share this code with anyone.
+  </p>
+  
+  <div style="border-top: 1px solid #e9ecef; padding-top: 20px; margin-top: 20px;">
+    <p style="font-size: 14px; color: #7f8c8d; margin-bottom: 5px;">Need help?</p>
+    <p style="font-size: 14px; margin: 0;">
+      Contact our support team at 
+      <a href="mailto:ajit.career@gmail.com" style="color: #3498db; text-decoration: none;">support@yourcompany.com</a>
+    </p>
+  </div>
+</div>
+
+<div style="text-align: center; padding: 20px 0; font-size: 12px; color: #95a5a6;">
+  <p style="margin: 5px 0;">© ${new Date().getFullYear()} Your Company Name. All rights reserved.</p>
+  <p style="margin: 5px 0;">
+    <a href="https://quiznewbackend.onrender.com/privacy" style="color: #95a5a6; text-decoration: none; margin: 0 10px;">Privacy Policy</a>
+    <a href="https://quiznewbackend.onrender.com/terms" style="color: #95a5a6; text-decoration: none; margin: 0 10px;">Terms of Service</a>
+  </p>
+</div>
+</div>
       `
     });
 
