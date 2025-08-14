@@ -242,7 +242,7 @@ const getPublishedQuiz = async (userId, limit) => {
       throw new Error('User ID is required');
     }
 
-    // Base query for public quizzes
+    // Base query for approved public quizzes
     const query = Quiz.find(
       { approvalStatus: 'approved' },
       {
@@ -254,18 +254,47 @@ const getPublishedQuiz = async (userId, limit) => {
         source: 1,
         estimatedTime: 1,
         approvalStatus: 1,
-        _id: 1
+        _id: 1,
+        createdAt: 1
       }
     ).lean();
 
-    // Only apply limit if it's greater than 0
     if (limit > 0) {
       query.limit(limit);
     }
 
-    // Execute the query
+    query.sort({ createdAt: -1 });
+
     const quizzes = await query.exec();
-    return quizzes;
+
+    // Get all active quizzes that are NOT completed
+    const activeQuizzes = await ActiveQuiz.find(
+      { status: { $ne: 'completed' } },  // Only include non-completed
+      { quiz: 1, status: 1, startedAt: 1 }
+    ).lean();
+
+    // Create a map of active quiz IDs with their status
+    const activeQuizMap = new Map();
+    activeQuizzes.forEach(activeQuiz => {
+      activeQuizMap.set(activeQuiz.quiz.toString(), {
+        isLive: true,
+        status: activeQuiz.status,
+        startedAt: activeQuiz.startedAt
+      });
+    });
+
+    // Add isLive flag and filter out completed quizzes
+    const filteredQuizzes = quizzes.map(quiz => {
+      const activeQuizInfo = activeQuizMap.get(quiz._id.toString());
+      return {
+        ...quiz,
+        isLive: !!activeQuizInfo,
+        status: activeQuizInfo?.status || 'inactive',
+        startedAt: activeQuizInfo?.startedAt || null
+      };
+    });
+
+    return filteredQuizzes;
   } catch (error) {
     console.error('Error fetching quizzes:', error);
     throw new Error('Failed to fetch quizzes: ' + error.message);
