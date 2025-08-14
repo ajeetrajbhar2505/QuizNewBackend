@@ -49,7 +49,6 @@ const getAllQuiz = async (userId) => {
         totalQuestions: 1,
         category: 1,
         description: 1,
-        isPublic: 1,
         estimatedTime: 1,
         source: 1,
         approvalStatus: 1,
@@ -245,14 +244,13 @@ const getPublishedQuiz = async (userId, limit) => {
 
     // Base query for public quizzes
     const query = Quiz.find(
-      { isPublic: true },
+      { approvalStatus: 'approved' },
       {
         difficulty: 1,
         title: 1,
         totalQuestions: 1,
         category: 1,
         description: 1,
-        isPublic: 1,
         source: 1,
         estimatedTime: 1,
         approvalStatus: 1,
@@ -311,7 +309,6 @@ const publishQuizById = async (quizId, userId, publish, approvalStatus) => {
       quizId,
       {
         $set: {
-          isPublic: publish,
           approvalStatus: approvalStatus,
           updatedAt: new Date()
         }
@@ -580,7 +577,6 @@ async function transformGeminiResponseToQuiz(geminiResponse, userId) {
     totalQuestions: geminiResponse.totalQuestions,
     createdBy: userId,
     isAdminCreated: isAdminCreated,
-    isPublic: false,
     createdAt: new Date(),
     updatedAt: new Date()
   };
@@ -602,7 +598,6 @@ async function createAdminQuizzesForTutors(baseQuiz, originalQuizId) {
     ...baseQuiz,
     createdBy: tutor._id,
     isAdminCreated: true,
-    isPublic: false,
     source: 'admin-template',
     originalQuizId: originalQuizId,
     approvalStatus: 'pending'

@@ -20,7 +20,6 @@ const quizSchema = new mongoose.Schema({
   estimatedTime : { type: String, required: true },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   isAdminCreated: { type: Boolean, default: false },
-  isPublic: { type: Boolean, default: false },
   approvalStatus: { type: String, default: 'pending' },
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
