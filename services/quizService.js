@@ -144,7 +144,7 @@ const getParticipants = async (quizId) => {
           _id: new ObjectId(quizId)
         }
       },
-      
+
       // Stage 2: Lookup quiz details
       {
         $lookup: {
@@ -155,7 +155,7 @@ const getParticipants = async (quizId) => {
         }
       },
       { $unwind: '$quizDetails' },
-     
+
       // Stage 3: Lookup host details
       {
         $lookup: {
@@ -166,7 +166,7 @@ const getParticipants = async (quizId) => {
         }
       },
       { $unwind: '$hostDetails' },
-     
+
       // Stage 4: Lookup participant details with enhanced pipeline
       {
         $lookup: {
@@ -198,7 +198,7 @@ const getParticipants = async (quizId) => {
           as: 'participantDetails'
         }
       },
-      
+
       // Stage 5: Merge participant data with their details
       {
         $addFields: {
@@ -228,24 +228,20 @@ const getParticipants = async (quizId) => {
           participantCount: { $size: '$participants' }
         }
       },
-      
+
       // Stage 6: Project the final structure
       {
         $project: {
           _id: 0,
-          quizInfo: {
-            quizId: '$quizDetails._id',
-            title: '$quizDetails.title',
-            description: '$quizDetails.description',
-            difficulty: '$quizDetails.difficulty',
-            totalQuestions: '$quizDetails.totalQuestions',
-            estimatedTime: '$quizDetails.estimatedTime'
-          },
-          sessionInfo: {
-            status: 1,
-            startedAt: 1,
-            participantCount: 1
-          },
+          quizId: '$quizDetails._id',
+          title: '$quizDetails.title',
+          description: '$quizDetails.description',
+          difficulty: '$quizDetails.difficulty',
+          totalQuestions: '$quizDetails.totalQuestions',
+          estimatedTime: '$quizDetails.estimatedTime',
+          status: 1,
+          startedAt: 1,
+          participantCount: 1,
           host: {
             _id: '$hostDetails._id',
             name: '$hostDetails.name',
