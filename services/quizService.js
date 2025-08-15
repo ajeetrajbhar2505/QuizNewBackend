@@ -138,12 +138,25 @@ const getActiveQuizes = async (userId, limit) => {
 const getParticipants = async (quizId) => {
   try {
     const pipeline = [
+      // Stage 1: Match the active quiz
       {
         $match: {
-          quiz: new ObjectId(quizId) 
+          _id: new ObjectId(quizId)
         }
       },
+      
+      // Stage 2: Lookup quiz details
+      {
+        $lookup: {
+          from: 'quizzes',
+          localField: 'quiz',
+          foreignField: '_id',
+          as: 'quizDetails'
+        }
+      },
+      { $unwind: '$quizDetails' },
      
+      // Stage 3: Lookup host details
       {
         $lookup: {
           from: 'users',
@@ -154,14 +167,23 @@ const getParticipants = async (quizId) => {
       },
       { $unwind: '$hostDetails' },
      
+      // Stage 4: Lookup participant details with enhanced pipeline
       {
         $lookup: {
           from: 'users',
-          let: { participantIds: '$participants.user' },
+          let: { participants: '$participants' },
           pipeline: [
             {
               $match: {
-                $expr: { $in: ['$_id', '$$participantIds'] }
+                $expr: {
+                  $in: ['$_id', {
+                    $map: {
+                      input: '$$participants',
+                      as: 'p',
+                      in: '$$p.user'
+                    }
+                  }]
+                }
               }
             },
             {
@@ -176,22 +198,24 @@ const getParticipants = async (quizId) => {
           as: 'participantDetails'
         }
       },
+      
+      // Stage 5: Merge participant data with their details
       {
         $addFields: {
           participants: {
             $map: {
-              input: "$participants",
-              as: "participant",
+              input: '$participants',
+              as: 'participant',
               in: {
                 $mergeObjects: [
-                  "$$participant",
+                  '$$participant',
                   {
                     $arrayElemAt: [
                       {
                         $filter: {
-                          input: "$participantDetails",
-                          as: "user",
-                          cond: { $eq: ["$$user._id", "$$participant.user"] }
+                          input: '$participantDetails',
+                          as: 'pd',
+                          cond: { $eq: ['$$pd._id', '$$participant.user'] }
                         }
                       },
                       0
@@ -201,40 +225,45 @@ const getParticipants = async (quizId) => {
               }
             }
           },
-          participantCount: { $size: "$participants" }
+          participantCount: { $size: '$participants' }
         }
       },
+      
+      // Stage 6: Project the final structure
       {
         $project: {
-          status: 1,
-          participants: "$mergedParticipants",
-          remainingParticipants: 1,
-          startedAt: 1,
-          estimatedTime: '$quizDetails.estimatedTime',
-          difficulty: '$quizDetails.difficulty',
-          totalQuestions: '$quizDetails.totalQuestions',
-          participantCount: 1,
-          title: '$quizDetails.title',
-          description: '$quizDetails.description',
-          quizId: '$quizDetails._id',
+          _id: 0,
+          quizInfo: {
+            quizId: '$quizDetails._id',
+            title: '$quizDetails.title',
+            description: '$quizDetails.description',
+            difficulty: '$quizDetails.difficulty',
+            totalQuestions: '$quizDetails.totalQuestions',
+            estimatedTime: '$quizDetails.estimatedTime'
+          },
+          sessionInfo: {
+            status: 1,
+            startedAt: 1,
+            participantCount: 1
+          },
           host: {
             _id: '$hostDetails._id',
             name: '$hostDetails.name',
             avatar: '$hostDetails.avatar',
             email: '$hostDetails.email'
-          }
+          },
+          participants: 1
         }
       }
     ];
 
-    const quiz = await ActiveQuiz.aggregate(pipeline).exec();
-    return quiz;
+    const result = await ActiveQuiz.aggregate(pipeline).exec();
+    return result[0] || null;
   } catch (error) {
-    console.error('Error fetching participants:', error);
-    throw new Error('Failed to fetch participants: ' + error.message);
+    console.error('Error fetching quiz with participants:', error);
+    throw new Error('Failed to fetch quiz details: ' + error.message);
   }
 };
-
 
 const getPublishedQuiz = async (userId, limit) => {
   try {
