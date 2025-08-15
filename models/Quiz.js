@@ -18,6 +18,7 @@ const quizSchema = new mongoose.Schema({
   source:{ type: String, required: true },
   totalQuestions:{ type: Number, default: 0 },
   estimatedTime : { type: String, required: true },
+  totalPoints : { type: String, required: true },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   isAdminCreated: { type: Boolean, default: false },
   approvalStatus: { type: String, default: 'pending' },

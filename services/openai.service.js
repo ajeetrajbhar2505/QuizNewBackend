@@ -28,7 +28,7 @@ class AIService {
       ]);
 
       // 4. Generate all questions in a single batch
-      const { questions, totalTime } = await this._generateAllQuestions(
+      const { questions, totalTime, totalPoints } = await this._generateAllQuestions(
         topic,
         questionCount,
         difficulty
@@ -43,6 +43,7 @@ class AIService {
         difficulty,
         totalQuestions: questionCount,
         estimatedTime: totalTime,
+        totalPoints: totalPoints,
         source: 'gemini',
         createdAt: new Date().toISOString(),
         questions: questions.map((q, index) => ({
@@ -124,15 +125,18 @@ class AIService {
       const result = await model.generateContent(prompt);
       const response = await result.response;
       const text = response.text();
-      
+
       // Parse the response
       const questions = this._parseBatchQuestionsResponse(text, count);
-      
+
       // Calculate total time
       const timePerQuestion = this._calculateTimePerQuestion(difficulty);
       const totalTime = timePerQuestion * count;
-
-      return { questions, totalTime };
+      let totalPoints = 0
+      questions.forEach((q) => {
+        totalPoints += q.points
+      })
+      return { questions, totalTime, totalPoints };
     } catch (error) {
       console.error('Batch question generation failed:', error);
       // Fallback to individual generation if batch fails
@@ -178,25 +182,25 @@ class AIService {
     try {
       const cleaned = text.replace(/```json|```/g, '').trim();
       const questions = JSON.parse(cleaned);
-      
+
       if (!Array.isArray(questions)) {
         throw new Error('Expected an array of questions');
       }
-      
+
       if (questions.length !== expectedCount) {
         throw new Error(`Expected ${expectedCount} questions, got ${questions.length}`);
       }
-      
+
       // Validate each question
       questions.forEach((q, index) => {
         if (!q.questionText || !q.options || !q.correctAnswer) {
           throw new Error(`Question ${index + 1} is missing required fields`);
         }
-        
+
         // Add points to each question
         q.points = 10;
       });
-      
+
       return questions;
     } catch (error) {
       console.error('Failed to parse batch questions:', error);
@@ -271,6 +275,7 @@ class AIService {
   static async _generateQuestionsWithTiming(topic, count, difficulty) {
     const questions = [];
     let totalTime = 0;
+    let totalPoints = 0;
     const timePerQuestion = this._calculateTimePerQuestion(difficulty);
 
     for (let i = 0; i < count; i++) {
@@ -285,6 +290,7 @@ class AIService {
 
         questions.push(question);
         totalTime += timePerQuestion;
+        totalPoints += question.points || 10;
       } catch (error) {
         console.error(`Question ${i + 1} failed:`, error.message);
         questions.push(this._createFallbackQuestion(i + 1, topic));
@@ -292,7 +298,7 @@ class AIService {
       }
     }
 
-    return { questions, totalTime };
+    return { questions, totalTime, totalPoints };
   }
 
   /**
@@ -407,7 +413,7 @@ class AIService {
     }
   }
 
-  static async  _buildRefreshPrompt(title, difficulty, originalQuestion) {
+  static async _buildRefreshPrompt(title, difficulty, originalQuestion) {
 
     const result = await model.generateContent(
       `Analyze this title: "${title}" and extract the main title/topic. 
@@ -415,7 +421,7 @@ class AIService {
     );
 
     const topic = (await result.response).text().trim();
-    
+
     return `Generate a new ${difficulty} difficulty quiz question about ${topic} to replace this existing question:
     
     Original Question: "${originalQuestion.question}"
