@@ -348,7 +348,7 @@ const deleteQuiz = async (quizId, userId) => {
 };
 
 
-const publishQuizById = async (quizId, userId, publish, approvalStatus) => {
+const publishQuizById = async (quizId, userId, approvalStatus) => {
   try {
     const quiz = await Quiz.findOne({
       _id: quizId,

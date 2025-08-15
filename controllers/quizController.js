@@ -91,9 +91,9 @@ const deleteQuiz = async (socket, quizId) => {
   }
 };
 
-const publish = async (socket, quizId, publish, approvalStatus) => {
+const publish = async (socket, quizId, approvalStatus) => {
   try {
-    const quiz = await quizService.publishQuizById(quizId, socket.user._id, publish, approvalStatus);
+    const quiz = await quizService.publishQuizById(quizId, socket.user._id, approvalStatus);
     socket.emit('quiz:publish:success', { quiz });
     getIO().emit('refreshpage');
   } catch (error) {
