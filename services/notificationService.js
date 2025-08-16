@@ -77,7 +77,6 @@ const sendBroadcastNotification = async ({ senderId, type, messageData }) => {
       return Notification.create({
         recipient: user._id,
         sender: senderId,
-        isBroadcast: true,
         type,
         title: notification.title,
         message: notification.message,
@@ -95,7 +94,7 @@ const sendBroadcastNotification = async ({ senderId, type, messageData }) => {
 const getUserNotifications = async (userId, language = 'en') => {
   const notifications = await Notification.find({
     $or: [
-      { recipient: userId },
+      { recipient: new Object(userId) },
       { isBroadcast: true }
     ]
   })
