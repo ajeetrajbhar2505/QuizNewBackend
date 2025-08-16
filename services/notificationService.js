@@ -94,8 +94,7 @@ const sendBroadcastNotification = async ({ senderId, type, messageData }) => {
 const getUserNotifications = async (userId, language = 'en') => {
   const notifications = await Notification.find({
     $or: [
-      { recipient: new Object(userId) },
-      { isBroadcast: true }
+      { recipient: new Object(userId) }
     ]
   })
   .sort({ createdAt: -1 })
@@ -112,8 +111,7 @@ const getUserNotifications = async (userId, language = 'en') => {
 const getUnreadNotificationsCount = async (userId) => {
   return Notification.countDocuments({
     $or: [
-      { recipient: userId, isRead: false },
-      { isBroadcast: true, isRead: false }
+      { recipient: userId, isRead: false }
     ]
   });
 };
