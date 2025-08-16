@@ -1,10 +1,12 @@
 const notificationService = require('../services/notificationService');
 const logger = require('../config/logger');
-const { getIO } = require('../config/socket');
 
 const getNotifications = async (socket) => {
   try {
-    const notifications = await notificationService.getUserNotifications(socket.user._id);
+    const notifications = await notificationService.getUserNotifications(
+      socket.user._id, 
+      socket.user.language || 'en'
+    );
     socket.emit('notification:get:success', { notifications });
   } catch (error) {
     socket.emit('notification:get:error', { error: error.message });
@@ -23,10 +25,16 @@ const markAsRead = async (socket, notificationId) => {
   }
 };
 
-const sendNotification = async (socket, { userId, message }) => {
+const sendNotification = async (socket, { userId, type, metadata, language }) => {
   try {
-    const notification = await notificationService.createNotification(userId, message);
-    getIO().to(`user_${userId}`).emit('notification:new', { notification });
+    const notification = await notificationService.createNotification({
+      recipientId: userId,
+      senderId: socket.user._id,
+      type,
+      metadata,
+      language
+    });
+    
     socket.emit('notification:send:success', { notification });
     logger.info(`Notification sent to user ${userId}`);
   } catch (error) {
@@ -35,8 +43,29 @@ const sendNotification = async (socket, { userId, message }) => {
   }
 };
 
+const sendBroadcastNotification = async (socket, { type, messageData }) => {
+  try {
+    if (!socket.user.isAdmin) {
+      throw new Error('Only admins can send broadcast notifications');
+    }
+
+    const notification = await notificationService.sendBroadcastNotification({
+      senderId: socket.user._id,
+      type,
+      messageData
+    });
+    
+    socket.emit('notification:broadcast:success', { notification });
+    logger.info(`Broadcast notification sent by admin ${socket.user._id}`);
+  } catch (error) {
+    socket.emit('notification:broadcast:error', { error: error.message });
+    logger.error(`Broadcast notification error: ${error.message}`);
+  }
+};
+
 module.exports = {
   getNotifications,
   markAsRead,
   sendNotification,
+  sendBroadcastNotification
 };

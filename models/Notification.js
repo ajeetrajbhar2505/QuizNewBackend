@@ -3,12 +3,16 @@ const mongoose = require('mongoose');
 const notificationSchema = new mongoose.Schema({
   recipient: { 
     type: mongoose.Schema.Types.ObjectId, 
-    ref: 'User', 
-    required: true 
+    ref: 'User',
+    required: function() { return !this.isBroadcast } 
   },
   sender: { 
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'User' 
+  },
+  isBroadcast: {
+    type: Boolean,
+    default: false
   },
   type: {
     type: String,
@@ -18,18 +22,20 @@ const notificationSchema = new mongoose.Schema({
       'question-ready',        // Next question is available
       'quiz-ended',           // Quiz has ended
       'results-available',    // Results are ready
-      'new-leader',          // You're now the leader
-      'achievement-unlocked' // Earned a badge/achievement
+      'new-leader',           // You're now the leader
+      'achievement-unlocked', // Earned a badge/achievement
+      'admin-announcement',   // Admin broadcast
+      'system-alert'          // System notification
     ],
     required: true
   },
   title: {
-    type: String,
-    required: true
+    en: { type: String, required: true },
+    hi: { type: String, required: true }
   },
   message: {
-    type: String,
-    required: true
+    en: { type: String, required: true },
+    hi: { type: String, required: true }
   },
   isRead: {
     type: Boolean,
@@ -47,6 +53,11 @@ const notificationSchema = new mongoose.Schema({
     type: String,
     enum: ['low', 'medium', 'high'],
     default: 'medium'
+  },
+  language: {
+    type: String,
+    enum: ['en', 'hi'],
+    default: 'en'
   }
 }, {
   timestamps: true  // Adds createdAt and updatedAt automatically
@@ -55,5 +66,6 @@ const notificationSchema = new mongoose.Schema({
 // Indexes for faster queries
 notificationSchema.index({ recipient: 1, isRead: 1 });
 notificationSchema.index({ recipient: 1, createdAt: -1 });
+notificationSchema.index({ isBroadcast: 1, createdAt: -1 });
 
 module.exports = mongoose.model('Notification', notificationSchema);
