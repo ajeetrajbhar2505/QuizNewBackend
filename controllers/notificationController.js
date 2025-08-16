@@ -1,5 +1,6 @@
 const notificationService = require('../services/notificationService');
 const logger = require('../config/logger');
+const { getIO } = require('../config/socket');
 
 const getNotifications = async (socket) => {
   try {
@@ -11,6 +12,19 @@ const getNotifications = async (socket) => {
   } catch (error) {
     socket.emit('notification:get:error', { error: error.message });
     logger.error(`Get notifications error: ${error.message}`);
+  }
+};
+
+const getUnreadNotificationsCount = async (socket) => {
+  try {
+    const notifications = await notificationService.getUnreadNotificationsCount(
+      socket.user._id, 
+      socket.user.language || 'en'
+    );
+    socket.emit('notification:UnreadNotificationsCount:success', notifications);
+  } catch (error) {
+    socket.emit('notification:UnreadNotificationsCount:error', { error: error.message });
+    logger.error(`Get Unread NotificationsCount error: ${error.message}`);
   }
 };
 
@@ -45,9 +59,6 @@ const sendNotification = async (socket, { userId, type, metadata, language }) =>
 
 const sendBroadcastNotification = async (socket, { type, messageData }) => {
   try {
-    if (!socket.user.isAdmin) {
-      throw new Error('Only admins can send broadcast notifications');
-    }
 
     const notification = await notificationService.sendBroadcastNotification({
       senderId: socket.user._id,
@@ -55,10 +66,10 @@ const sendBroadcastNotification = async (socket, { type, messageData }) => {
       messageData
     });
     
-    socket.emit('notification:broadcast:success', { notification });
+    getIO().emit('notification:broadcast:success', { notification });
     logger.info(`Broadcast notification sent by admin ${socket.user._id}`);
   } catch (error) {
-    socket.emit('notification:broadcast:error', { error: error.message });
+    getIO().emit('notification:broadcast:error', { error: error.message });
     logger.error(`Broadcast notification error: ${error.message}`);
   }
 };
@@ -67,5 +78,6 @@ module.exports = {
   getNotifications,
   markAsRead,
   sendNotification,
-  sendBroadcastNotification
+  sendBroadcastNotification,
+  getUnreadNotificationsCount
 };

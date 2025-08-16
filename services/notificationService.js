@@ -71,23 +71,23 @@ const sendBroadcastNotification = async ({ senderId, type, messageData }) => {
     priority: 'high'
   });
 
-  // Store the broadcast notification in all users' records
-  const users = await User.find({});
-  await Promise.all(users.map(user => {
-    return Notification.create({
-      recipient: user._id,
-      sender: senderId,
-      isBroadcast: true,
-      type,
-      title: notification.title,
-      message: notification.message,
-      metadata: notification.metadata,
-      actionUrl: notification.actionUrl,
-      priority: notification.priority,
-      language: notification.language,
-      broadcastId: notification._id  // Reference to original broadcast
-    });
-  }));
+    // Store the broadcast notification in all users' records
+    const users = await User.find({});
+    await Promise.all(users.map(user => {
+      return Notification.create({
+        recipient: user._id,
+        sender: senderId,
+        isBroadcast: true,
+        type,
+        title: notification.title,
+        message: notification.message,
+        metadata: notification.metadata,
+        actionUrl: notification.actionUrl,
+        priority: notification.priority,
+        language: notification.language,
+        broadcastId: notification._id  // Reference to original broadcast
+      });
+    }));
 
   return notification;
 };
@@ -109,6 +109,17 @@ const getUserNotifications = async (userId, language = 'en') => {
   }));
 };
 
+
+const getUnreadNotificationsCount = async (userId) => {
+  return Notification.countDocuments({
+    $or: [
+      { recipient: userId, isRead: false },
+      { isBroadcast: true, isRead: false }
+    ]
+  });
+};
+
+
 const markNotificationAsRead = async (userId, notificationId) => {
   const notification = await Notification.findOneAndUpdate(
     { _id: notificationId, recipient: userId },
@@ -127,5 +138,6 @@ module.exports = {
   createNotification,
   sendBroadcastNotification,
   getUserNotifications,
-  markNotificationAsRead
+  markNotificationAsRead,
+  getUnreadNotificationsCount
 };
