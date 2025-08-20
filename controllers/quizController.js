@@ -1,4 +1,5 @@
 const quizService = require('../services/quizService');
+const notificationController = require('../controllers/notificationController');
 const logger = require('../config/logger');
 const { getIO } = require('../config/socket');
 
@@ -8,14 +9,14 @@ const createQuiz = async (socket, data) => {
     socket.emit('quiz:create:success', { quiz });
     logger.info(`Quiz created by user ${socket.user._id}`);
   } catch (error) {
-    socket.emit('quiz:create:error', { error: error.message,prompt : data.prompt});
+    socket.emit('quiz:create:error', { error: error.message, prompt: data.prompt });
     logger.error(`Quiz creation error: ${error.message}`);
   }
 };
 
-const refreshQuestion = async (socket, quizId,questionIndex) => {
+const refreshQuestion = async (socket, quizId, questionIndex) => {
   try {
-    const quiz = await quizService.refreshQuestion(socket.user._id,quizId,questionIndex);
+    const quiz = await quizService.refreshQuestion(socket.user._id, quizId, questionIndex);
     socket.emit('quiz:refreshQuestion:success', { quiz });
     logger.info(`Quiz created by user ${socket.user._id}`);
   } catch (error) {
@@ -24,9 +25,9 @@ const refreshQuestion = async (socket, quizId,questionIndex) => {
   }
 };
 
-const getPublishedQuiz = async (socket,limit) => {
+const getPublishedQuiz = async (socket, limit) => {
   try {
-    const quizes = await quizService.getPublishedQuiz(socket.user._id,limit);
+    const quizes = await quizService.getPublishedQuiz(socket.user._id, limit);
     socket.emit('quiz:published:success', { quizes });
     logger.info(`Quiz all by user ${socket.user._id}`);
   } catch (error) {
@@ -46,9 +47,9 @@ const getAllQuiz = async (socket) => {
   }
 };
 
-const getActiveQuizes = async (socket,limit) => {
+const getActiveQuizes = async (socket, limit) => {
   try {
-    const quizes = await quizService.getActiveQuizes(socket.user._id,limit);
+    const quizes = await quizService.getActiveQuizes(socket.user._id, limit);
     socket.emit('quiz:active:success', { quizes });
     logger.info(`Quiz all by user ${socket.user._id}`);
   } catch (error) {
@@ -57,7 +58,7 @@ const getActiveQuizes = async (socket,limit) => {
   }
 };
 
-const getParticipants = async (socket,quizId) => {
+const getParticipants = async (socket, quizId) => {
   try {
     const quiz = await quizService.getParticipants(quizId);
     socket.emit('quiz:participants:success', { quiz });
@@ -104,8 +105,10 @@ const publish = async (socket, quizId, approvalStatus) => {
 
 const startWaiting = async (socket, quizId) => {
   try {
-    const activeQuiz = await quizService.startWaiting(quizId, socket.user._id);
+    const { activeQuiz, notificationMetadata } = await quizService.startWaiting(quizId, socket.user._id);
+
     socket.emit('quiz:waiting:success', { activeQuiz });
+    notificationController.sendBroadcastNotification(socket, { type: 'quiz-invitation', metadata: notificationMetadata })
     getIO().emit('refreshpage');
     logger.info(`Quiz ${quizId} hosted by user ${socket.user._id}`);
   } catch (error) {
@@ -117,6 +120,8 @@ const startWaiting = async (socket, quizId) => {
 const joinQuiz = async (socket, quizId) => {
   try {
     const activeQuiz = await quizService.joinQuiz(quizId, socket.user._id);
+    socket.join(`quiz_${quizId}`);
+    socket.join(`user_${socket.user._id}`);
     socket.emit('quiz:join:success', { activeQuiz });
     getIO().emit('refreshpage');
     logger.info(`Quiz ${quizId} joined by new user ${socket.user._id}`);
@@ -150,6 +155,18 @@ const submitQuiz = async (socket, quizId) => {
   }
 };
 
+const completeQuizByHost = async (socket, quizId) => {
+  try {
+    const activeQuiz = await quizService.completeQuizByHost(socket.user._id, quizId, socket.user._id);
+    socket.emit('quiz:completeQuizByHost:success', { activeQuiz });
+    getIO().emit('refreshpage');
+    logger.info(`Quiz ${quizId} submitted by user ${socket.user._id}`);
+  } catch (error) {
+    socket.emit('quiz:completeQuizByHost:error', { error: error.message });
+    logger.error(`Submit quiz error: ${error.message}`);
+  }
+};
+
 const submitAnswer = async (socket, { quizId, questionId, answer }) => {
   try {
     const result = await quizService.submitAnswer(
@@ -178,6 +195,7 @@ module.exports = {
   refreshQuestion,
   getPublishedQuiz,
   submitQuiz,
+  completeQuizByHost,
   joinQuiz,
   startWaiting,
   getActiveQuizes,

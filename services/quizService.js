@@ -4,6 +4,7 @@ const ActiveQuiz = require('../models/ActiveQuiz');
 const { getIO } = require('../config/socket');
 const AimlQuizService = require('./openai.service');
 const { ObjectId } = require('mongoose').Types;
+const notificationController = require('../controllers/notificationController');
 
 const createQuiz = async (data, userId) => {
   const geminiResponse = await AimlQuizService.generateQuiz(data.prompt);
@@ -386,7 +387,10 @@ const getQuizById = async (quizId) => {
 
 // Start waiting period for quiz
 const startWaiting = async (quizId, userId) => {
-  const quiz = await getQuizById(quizId);
+  const [quiz, user] = await Promise.all([
+    getQuizById(quizId),
+    User.findById(userId)
+  ]);
 
   // Check if there's already an active quiz
   const existingActiveQuiz = await ActiveQuiz.findOne({
@@ -408,8 +412,11 @@ const startWaiting = async (quizId, userId) => {
   // Join the quiz room
   const io = getIO();
   io.to(`user_${userId}`).socketsJoin(`quiz_${quizId}`);
-
-  return activeQuiz;
+  let notificationMetadata = {
+    custom_data: quiz.title,
+    inviterName: user.name
+  }
+  return { activeQuiz, notificationMetadata };
 };
 
 // Start the quiz (transition from waiting to in-progress)
@@ -476,8 +483,65 @@ const joinQuiz = async (quizId, userId) => {
   return activeQuiz;
 };
 
-// Submit the quiz (mark as completed)
+// Submit the quiz (mark user's participation as completed)
 const submitQuiz = async (quizId, userId) => {
+  const activeQuiz = await ActiveQuiz.findOne({
+    quiz: quizId,
+    status: 'in-progress',
+    'participants.user': userId
+  });
+
+  if (!activeQuiz) {
+    throw new Error('No active quiz found or you are not a participant');
+  }
+
+  // Find the participant and mark as completed
+  const participantIndex = activeQuiz.participants.findIndex(
+    p => p.user.toString() === userId.toString()
+  );
+
+  if (participantIndex === -1) {
+    throw new Error('User is not a participant in this quiz');
+  }
+
+  // Update participant's end time and status
+  activeQuiz.participants[participantIndex].endedAt = new Date();
+  activeQuiz.participants[participantIndex].status = 'completed';
+
+  // Check if all participants have completed
+  const allCompleted = activeQuiz.participants.every(
+    p => p.status === 'completed' || p.status === 'disconnected'
+  );
+
+  // If all participants completed, mark the entire quiz as completed
+  if (allCompleted) {
+    activeQuiz.status = 'completed';
+    activeQuiz.endedAt = new Date();
+  }
+
+  await activeQuiz.save();
+  const quiz = await Quiz.findById(quizId)
+
+
+  // Notify the host that a participant has submitted
+  const io = getIO();
+  io.to(`quiz_${quizId}`).emit('quiz:participant-submitted', {
+    userId,
+    activeQuiz
+  });
+
+  // If quiz is fully completed, notify everyone
+  if (allCompleted) {
+    io.to(`quiz_${quizId}`).emit('quiz:completed', { activeQuiz });
+  }
+
+  notificationController.sendNotification(socket, { recipientId: userId, type: 'quiz-ended', metadata: { custom_data: quiz.title } })
+  return activeQuiz;
+};
+
+
+// Host/admin version to complete the entire quiz
+const completeQuizByHost = async (senderId, quizId, userId) => {
   const activeQuiz = await ActiveQuiz.findOneAndUpdate(
     {
       quiz: quizId,
@@ -494,19 +558,17 @@ const submitQuiz = async (quizId, userId) => {
   if (!activeQuiz) {
     throw new Error('No active quiz found or you are not the host');
   }
+  const quiz = await Quiz.findById(quizId)
 
   // Complete all participants' sessions
   activeQuiz.participants.forEach(participant => {
     if (!participant.endedAt) {
       participant.endedAt = new Date();
+      participant.status = 'completed';
+      notificationController.sendNotification(senderId, { recipientId: participant.user, type: 'quiz-ended', metadata: { custom_data: quiz.title } })
     }
   });
   await activeQuiz.save();
-
-  // Notify all participants
-  const io = getIO();
-  io.to(`quiz_${quizId}`).emit('quiz:completed', { activeQuiz });
-
   return activeQuiz;
 };
 
@@ -673,6 +735,7 @@ module.exports = {
   refreshQuestion,
   getPublishedQuiz,
   submitQuiz,
+  completeQuizByHost,
   joinQuiz,
   startWaiting,
   getActiveQuizes,

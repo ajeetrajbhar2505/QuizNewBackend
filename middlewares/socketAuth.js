@@ -22,6 +22,9 @@ const authenticate = async (socket, next) => {
       throw new Error('Invalid or expired token');
     }
 
+     // Also join user-specific room for notifications
+     socket.join(`user_${decoded.userId}`);
+
     // Attach user to socket
     socket.user = {
       _id: decoded.userId,

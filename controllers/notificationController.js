@@ -5,7 +5,7 @@ const { getIO } = require('../config/socket');
 const getNotifications = async (socket) => {
   try {
     const notifications = await notificationService.getUserNotifications(
-      socket.user._id, 
+      socket.user._id,
       socket.user.language || 'en'
     );
     socket.emit('notification:get:success', { notifications });
@@ -18,7 +18,7 @@ const getNotifications = async (socket) => {
 const getUnreadNotificationsCount = async (socket) => {
   try {
     const notifications = await notificationService.getUnreadNotificationsCount(
-      socket.user._id, 
+      socket.user._id,
       socket.user.language || 'en'
     );
     socket.emit('notification:UnreadNotificationsCount:success', notifications);
@@ -39,33 +39,32 @@ const markAsRead = async (socket, notificationId) => {
   }
 };
 
-const sendNotification = async (socket, { userId, type, metadata, language }) => {
+const sendNotification = async (senderId, { recipientId, type, metadata, language }) => {
   try {
     const notification = await notificationService.createNotification({
-      recipientId: userId,
-      senderId: socket.user._id,
+      recipientId: recipientId,
+      senderId: senderId,
       type,
       metadata,
       language
     });
-    
-    socket.emit('notification:send:success', { notification });
-    logger.info(`Notification sent to user ${userId}`);
+    getIO().to(`user_${recipientId}`).emit('notification:send:success', { notification });
+    logger.info(`Notification sent to user ${recipientId}`);
   } catch (error) {
-    socket.emit('notification:send:error', { error: error.message });
+    getIO().to(`user_${recipientId}`).emit('notification:send:error', { error: error.message });
     logger.error(`Send notification error: ${error.message}`);
   }
 };
 
-const sendBroadcastNotification = async (socket, { type, messageData }) => {
+const sendBroadcastNotification = async (socket, { type, metadata }) => {
   try {
 
     const notification = await notificationService.sendBroadcastNotification({
       senderId: socket.user._id,
       type,
-      messageData
+      metadata
     });
-    
+
     getIO().emit('notification:broadcast:success', { notification });
     logger.info(`Broadcast notification sent by admin ${socket.user._id}`);
   } catch (error) {

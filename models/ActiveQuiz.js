@@ -6,6 +6,7 @@ const activeQuizSchema = new mongoose.Schema({
   participants: [{
     user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     score: { type: Number, default: 0 },
+    status: { type: String, enum: ['in-progress', 'completed'], default: 'in-progress' },
     startedAt: { type: Date },
     endedAt: { type: Date }
   }],

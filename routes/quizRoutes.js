@@ -14,7 +14,7 @@ const setupQuizRoutes = (socket) => {
   socket.on('quiz:participants', (quizId) => quizController.getParticipants(socket, quizId));
   socket.on('quiz:delete', (quizId) => quizController.deleteQuiz(socket, quizId));
   socket.on('quiz:answer:submit', (data) => quizController.submitAnswer(socket, data));
-  socket.on('quiz:submit', (data) => quizController.submitQuiz(socket, data));
+  socket.on('quiz:completeQuizByHost', (data) => quizController.completeQuizByHost(socket, data));
 };
 
 module.exports = setupQuizRoutes;
