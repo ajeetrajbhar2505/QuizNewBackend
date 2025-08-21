@@ -23,7 +23,7 @@ const NOTIFICATION_TEMPLATES   = {
     hi: { title: 'नया क्विज', message: '{custom_data} में अगला क्विज उपलब्ध है' }
   },
   'quiz-ended': {
-    en: { title: 'Quiz Ended', message: '{custom_data} has ended. Thanks for playing!' },
+    en: { title: 'Quiz Ended ', message: '{custom_data} has ended. Thanks for playing!' },
     hi: { title: 'क्विज समाप्त', message: '{custom_data} समाप्त हो गई है। खेलने के लिए धन्यवाद!' }
   },
   'results-available': {
@@ -79,13 +79,6 @@ const createNotification = async ({
     priority,
     language
   });
-
-  // Emit to specific user or all users for broadcast
-  if (isBroadcast) {
-    getIO().emit('notification:new', { notification });
-  } else {
-    getIO().to(`user_${recipientId}`).emit('notification:new', { notification });
-  }
 
   return notification;
 };

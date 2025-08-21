@@ -109,7 +109,6 @@ const startWaiting = async (socket, quizId) => {
 
     socket.emit('quiz:waiting:success', { activeQuiz });
     notificationController.sendBroadcastNotification(socket, { type: 'quiz-invitation', metadata: notificationMetadata })
-    getIO().emit('refreshpage');
     logger.info(`Quiz ${quizId} hosted by user ${socket.user._id}`);
   } catch (error) {
     socket.emit('quiz:waiting:error', { error: error.message });
