@@ -1,5 +1,6 @@
 const authService = require('../services/authService');
 const logger = require('../config/logger');
+const { getIO } = require('../config/socket');
 
 const register = async (socket, data) => {
   try {
@@ -33,13 +34,13 @@ const verifyOtpAndLogin = async (socket, email, otp, verificationToken) => {
       verificationToken
     );
     
-    socket.emit('auth:otp:verify:success', {
+     getIO().to(`user_${result.user._id}`).emit('auth:otp:verify:success', {
       token: result.token,
       user: result.user
     });
     logger.info(`OTP verified and user logged in: ${email}`);
   } catch (error) {
-    socket.emit('auth:otp:verify:error', { 
+     socket.emit('auth:otp:verify:error', { 
       message: error.message,
       email: email
     });
@@ -102,7 +103,7 @@ const googleCallback = async (socket, code) => {
 
         const { token, user } = await authService.handleGoogleCallback(code, sessionInfo);
         success = true;
-        socket.emit('auth:google:success', { token, user });
+        getIO().to(`user_${user._id}`).emit('auth:google:success', { token, user });
         logger.info(`Google login successful for user: ${user.name}`);
       } catch (error) {
         console.log(error);
@@ -144,10 +145,9 @@ const facebookCallback = async (socket, code) => {
       try {
 
         const { token, user } = await authService.handleFacebookCallback(code, sessionInfo);
-        socket.emit('auth:facebook:success', { token, user });
+        getIO().to(`user_${user._id}`).emit('auth:facebook:success', { token, user });
         logger.info(`Facebook login successful for user: ${user.name}`);
         success = true;
-        socket.emit('auth:facebook:success', user);
       } catch (error) {
         lastError = error;
         retryCount++;
