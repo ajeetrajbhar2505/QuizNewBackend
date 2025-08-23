@@ -1,7 +1,6 @@
 const Notification = require('../models/Notification');
 const User = require('../models/User');
-const logger = require('../config/logger');
-const { getIO } = require('../config/socket');
+
 
 // Notification templates for each type
 // Notification templates for each type
