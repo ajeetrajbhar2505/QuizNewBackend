@@ -634,30 +634,14 @@ const submitAnswer = async (quizId, questionId, answer, userId) => {
     activeQuiz.participants.push(participant);
   }
 
-  // Check if question was already answered
-  const existingAnswer = participant.answers.find(a => a.question.equals(questionId));
-  if (existingAnswer) {
-    throw new Error('Question already answered');
-  }
-
   participant.endedAt = new Date()
   participant.score += points;
   await activeQuiz.save();
-
-  // Update user stats
-  await User.findByIdAndUpdate(userId, {
-    $inc: {
-      totalPoints: points,
-      quizzesTaken: participant.answers.length === quiz.questions.length ? 1 : 0,
-      correctAnswers: isCorrect ? 1 : 0
-    }
-  });
 
   return {
     isCorrect,
     points,
     currentScore: participant.score,
-    questionsRemaining: quiz.questions.length - participant.answers.length
   };
 };
 
