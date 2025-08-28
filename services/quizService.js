@@ -380,6 +380,16 @@ const publishQuizById = async (quizId, userId, approvalStatus) => {
 
 // Helper function to get quiz by ID
 const getQuizById = async (quizId) => {
+
+  const activeQuiz = await ActiveQuiz.findOne({
+    quiz: quizId,
+    status: 'in-progress'
+  });
+
+  if (activeQuiz) {
+    throw new Error('Cannot view quiz while it is in progress. Please try again after the quiz ends.');
+  }
+
   const quiz = await Quiz.findById(quizId);
   if (!quiz) throw new Error('Quiz not found');
   return quiz;
@@ -388,6 +398,7 @@ const getQuizById = async (quizId) => {
 
 // Helper function to get quiz by ID
 const getLiveQuizById = async (quizId) => {
+
   const quiz = await Quiz.findById(quizId);
   if (!quiz) throw new Error('Quiz not found');
   
