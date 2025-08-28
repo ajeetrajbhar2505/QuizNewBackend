@@ -10,7 +10,6 @@ const activeQuizSchema = new mongoose.Schema({
     startedAt: { type: Date },
     endedAt: { type: Date }
   }],
-  currentQuestion: { type: Number, default: 0 },
   status: { type: String, enum: ['waiting', 'in-progress', 'completed'], default: 'waiting' },
   startedAt: { type: Date },
   endedAt: { type: Date },

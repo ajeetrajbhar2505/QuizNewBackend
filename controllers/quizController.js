@@ -82,6 +82,16 @@ const getQuiz = async (socket, quizId) => {
   }
 };
 
+const getLiveQuiz = async (socket, quizId) => {
+  try {
+    const quiz = await quizService.getLiveQuizById(quizId);
+    socket.emit('livequiz:get:success', { quiz });
+  } catch (error) {
+    socket.emit('livequiz:get:error', { error: error.message });
+    logger.error(`Get quiz error: ${error.message}`);
+  }
+};
+
 const deleteQuiz = async (socket, quizId) => {
   try {
     const quiz = await quizService.deleteQuiz(quizId, socket.user._id);
@@ -186,6 +196,7 @@ const submitAnswer = async (socket, { quizId, questionId, answer }) => {
 module.exports = {
   createQuiz,
   getQuiz,
+  getLiveQuiz,
   startQuiz,
   submitAnswer,
   getAllQuiz,

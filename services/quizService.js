@@ -385,6 +385,24 @@ const getQuizById = async (quizId) => {
   return quiz;
 };
 
+
+// Helper function to get quiz by ID
+const getLiveQuizById = async (quizId) => {
+  const quiz = await Quiz.findById(quizId);
+  if (!quiz) throw new Error('Quiz not found');
+  
+  // Remove correctAnswer from each question
+  const quizWithoutAnswers = {
+    ...quiz.toObject(),
+    questions: quiz.questions.map(question => {
+      const { correctAnswer,explanation, ...questionWithoutAnswer } = question.toObject();
+      return questionWithoutAnswer;
+    })
+  };
+  
+  return quizWithoutAnswers;
+};
+
 // Start waiting period for quiz
 const startWaiting = async (quizId, userId) => {
   const [quiz, user] = await Promise.all([
@@ -611,14 +629,7 @@ const submitAnswer = async (quizId, questionId, answer, userId) => {
     throw new Error('Question already answered');
   }
 
-  // Update participant's answer and score
-  participant.answers.push({
-    question: questionId,
-    answer,
-    isCorrect,
-    answeredAt: new Date()
-  });
-
+  participant.endedAt = new Date()
   participant.score += points;
   await activeQuiz.save();
 
@@ -631,21 +642,10 @@ const submitAnswer = async (quizId, questionId, answer, userId) => {
     }
   });
 
-  // Notify host about answer submission
-  const io = getIO();
-  io.to(`user_${activeQuiz.host}`).emit('quiz:answer-submitted', {
-    userId,
-    questionId,
-    isCorrect,
-    score: participant.score
-  });
-
   return {
     isCorrect,
     points,
     currentScore: participant.score,
-    correctAnswer: question.correctAnswer,
-    explanation: question.explanation,
     questionsRemaining: quiz.questions.length - participant.answers.length
   };
 };
@@ -727,6 +727,7 @@ async function createAdminQuizzesForTutors(baseQuiz, originalQuizId) {
 module.exports = {
   createQuiz,
   getQuizById,
+  getLiveQuizById,
   startQuiz,
   submitAnswer,
   getAllQuiz,
