@@ -104,6 +104,28 @@ const getActiveQuizes = async (userId, limit) => {
               new ObjectId(userId), 
               '$participants.user'
             ]
+          },
+          userSubmissionStatus: {
+            $let: {
+              vars: {
+                userParticipant: {
+                  $arrayElemAt: [
+                    {
+                      $filter: {
+                        input: '$participants',
+                        cond: { $eq: ['$$this.user', new ObjectId(userId)] }
+                      }
+                    },
+                    0
+                  ]
+                }
+              },
+              in: {
+                isSubmitted: { $ifNull: ['$$userParticipant.isSubmitted', false] },
+                score: { $ifNull: ['$$userParticipant.score', 0] },
+                status: { $ifNull: ['$$userParticipant.status', 'waiting'] }
+              }
+            }
           }
         }
       },
@@ -121,6 +143,7 @@ const getActiveQuizes = async (userId, limit) => {
           description: '$quizDetails.description',
           quizId: '$quizDetails._id',
           isParticipant : 1,
+          userSubmissionStatus : 1,
           host: {
             _id: '$hostDetails._id',
             name: '$hostDetails.name',
@@ -546,6 +569,7 @@ const submitQuiz = async (quizId, userId) => {
   }
 
   // Update participant's end time and status
+  activeQuiz.participants[participantIndex].isSubmitted = true
   activeQuiz.participants[participantIndex].endedAt = new Date();
   activeQuiz.participants[participantIndex].status = 'completed';
 
@@ -556,6 +580,7 @@ const submitQuiz = async (quizId, userId) => {
 
   // If all participants completed, mark the entire quiz as completed
   if (allCompleted) {
+    activeQuiz.isSubmitted = true;
     activeQuiz.status = 'completed';
     activeQuiz.endedAt = new Date();
   }
@@ -576,7 +601,7 @@ const submitQuiz = async (quizId, userId) => {
     io.to(`quiz_${quizId}`).emit('quiz:completed', { activeQuiz });
   }
 
-  notificationController.sendNotification(socket, { recipientId: userId, type: 'quiz-ended', metadata: { custom_data: quiz.title } })
+  notificationController.sendNotification(userId, { recipientId: userId, type: 'quiz-ended', metadata: { custom_data: quiz.title } })
   return activeQuiz;
 };
 
