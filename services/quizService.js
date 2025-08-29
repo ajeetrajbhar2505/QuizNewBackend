@@ -5,6 +5,7 @@ const { getIO } = require('../config/socket');
 const AimlQuizService = require('./openai.service');
 const { ObjectId } = require('mongoose').Types;
 const notificationController = require('../controllers/notificationController');
+const UserStats = require('../models/UserStats');
 
 const createQuiz = async (data, userId) => {
   const geminiResponse = await AimlQuizService.generateQuiz(data.prompt);
@@ -98,6 +99,12 @@ const getActiveQuizes = async (userId, limit) => {
       {
         $addFields: {
           participantCount: { $size: '$participants' },
+          isParticipant: {
+            $in: [
+              new ObjectId(userId), 
+              '$participants.user'
+            ]
+          }
         }
       },
       {
@@ -113,6 +120,7 @@ const getActiveQuizes = async (userId, limit) => {
           title: '$quizDetails.title',
           description: '$quizDetails.description',
           quizId: '$quizDetails._id',
+          isParticipant : 1,
           host: {
             _id: '$hostDetails._id',
             name: '$hostDetails.name',
@@ -122,6 +130,7 @@ const getActiveQuizes = async (userId, limit) => {
         }
       }
     ];
+
 
     // Add $limit stage only if limit > 0
     if (limit > 0) {
@@ -622,9 +631,6 @@ const submitAnswer = async (quizId, questionId, answer, userId) => {
     throw new Error('Question not found');
   }
 
-  const isCorrect = question.correctAnswer === answer;
-  const points = isCorrect ? question.points : 0;
-
   // Find or create participant
   let participant = activeQuiz.participants.find(p => p.user.equals(userId));
   if (!participant) {
@@ -637,9 +643,55 @@ const submitAnswer = async (quizId, questionId, answer, userId) => {
     activeQuiz.participants.push(participant);
   }
 
-  participant.endedAt = new Date()
-  participant.score += points;
+  // Check if user has already answered this question
+  const existingAnswerIndex = participant.answers.findIndex(a => a.question.equals(questionId));
+  
+  const isCorrect = question.correctAnswer === answer;
+  const points = isCorrect ? question.points : 0;
+
+  let statsUpdateData = {
+    isNewAnswer: false,
+    previousPoints: 0,
+    previousCorrectness: false
+  };
+
+  if (existingAnswerIndex !== -1) {
+    // User already answered - update existing answer and adjust score
+    const previousAnswer = participant.answers[existingAnswerIndex];
+    statsUpdateData.previousPoints = previousAnswer.points;
+    statsUpdateData.previousCorrectness = previousAnswer.isCorrect;
+    
+    // Update the existing answer
+    participant.answers[existingAnswerIndex] = {
+      question: questionId,
+      answer: answer,
+      isCorrect: isCorrect,
+      points: points,
+      answeredAt: new Date()
+    };
+
+    // Adjust score by removing previous points and adding new points
+    participant.score = participant.score - statsUpdateData.previousPoints + points;
+  } else {
+    // New answer - record it and add points
+    statsUpdateData.isNewAnswer = true;
+    participant.answers.push({
+      question: questionId,
+      answer: answer,
+      isCorrect: isCorrect,
+      points: points,
+      answeredAt: new Date()
+    });
+    participant.score += points;
+  }
+
+  participant.endedAt = new Date();
+  
+  // Save the active quiz first
   await activeQuiz.save();
+
+  // Update user statistics
+  await updateUserStats(userId, isCorrect, points, statsUpdateData);
 
   return {
     isCorrect,
@@ -648,6 +700,90 @@ const submitAnswer = async (quizId, questionId, answer, userId) => {
   };
 };
 
+// Helper function to update user statistics
+const updateUserStats = async (userId, isCorrect, points, statsUpdateData) => {
+  const now = new Date();
+  const today = new Date(now.setHours(0, 0, 0, 0));
+  
+  const updateData = {
+    $inc: {
+      points: points - statsUpdateData.previousPoints
+    },
+    $set: {
+      lastActive: now
+    }
+  };
+
+  // Handle correct/wrong answer counters and total quizzes
+  if (!statsUpdateData.isNewAnswer) {
+    // This is an answer update - adjust counters based on previous and current correctness
+    if (statsUpdateData.previousCorrectness && !isCorrect) {
+      // Was correct, now wrong
+      updateData.$inc.correctAnswers = -1;
+      updateData.$inc.wrongAnswers = 1;
+    } else if (!statsUpdateData.previousCorrectness && isCorrect) {
+      // Was wrong, now correct
+      updateData.$inc.correctAnswers = 1;
+      updateData.$inc.wrongAnswers = -1;
+    }
+    // If both previous and current are same (both correct or both wrong), no change needed
+  } else {
+    // This is a new answer
+    updateData.$inc.totalQuizzes = 1;
+    if (isCorrect) {
+      updateData.$inc.correctAnswers = 1;
+    } else {
+      updateData.$inc.wrongAnswers = 1;
+    }
+  }
+
+  // Handle streak logic
+  const userStats = await UserStats.findOne({ user: userId });
+  if (userStats) {
+    const lastUpdated = new Date(userStats.streak.lastUpdated);
+    const lastUpdatedDate = new Date(lastUpdated.setHours(0, 0, 0, 0));
+    
+    if (lastUpdatedDate.getTime() === today.getTime()) {
+      // Already updated today, no streak change needed
+    } else if (lastUpdatedDate.getTime() === today.getTime() - 86400000) {
+      // Consecutive day - increment streak
+      updateData.$inc = {
+        ...updateData.$inc,
+        'streak.current': 1
+      };
+      updateData.$set = {
+        ...updateData.$set,
+        'streak.lastUpdated': today
+      };
+      
+      // Update longest streak if current exceeds it
+      if (userStats.streak.current + 1 > userStats.streak.longest) {
+        updateData.$set['streak.longest'] = userStats.streak.current + 1;
+      }
+    } else {
+      // Broken streak - reset to 1
+      updateData.$set = {
+        ...updateData.$set,
+        'streak.current': 1,
+        'streak.lastUpdated': today
+      };
+    }
+  } else {
+    // First time user - initialize streak
+    updateData.$set = {
+      ...updateData.$set,
+      'streak.current': 1,
+      'streak.lastUpdated': today,
+      'streak.longest': 1
+    };
+  }
+
+  await UserStats.findOneAndUpdate(
+    { user: userId },
+    updateData,
+    { upsert: true, new: true }
+  );
+};
 
 async function transformGeminiResponseToQuiz(geminiResponse, userId) {
   // Transform each question to match your schema
