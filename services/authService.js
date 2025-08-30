@@ -403,6 +403,7 @@ const handleGoogleCallback = async (code, req) => {
 
     } else {
       user = new User({
+        _id: new mongoose.Types.ObjectId(), 
         name,
         email,
         googleId,
@@ -548,6 +549,7 @@ const handleFacebookCallback = async (code, req) => {
 
     } else {
       user = new User({
+        _id: new mongoose.Types.ObjectId(), 
         name,
         email: userEmail,
         facebookId,
