@@ -51,17 +51,19 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
 };
 
 // Login status management methods
-userSchema.methods.markAsLoggedIn = function (sessionInfo = {}) {
-  this.isLoggedIn = true;
+userSchema.methods.markAsLoggedIn = function(sessionInfo) {
   this.lastLoginAt = new Date();
-  this.activeSessions += 1;
-  this.loginHistory.push({
-    timestamp: new Date(),
-    ipAddress: sessionInfo.ipAddress,
-    userAgent: sessionInfo.userAgent
-  });
-  // Keep only last 10 login records
-  if (this.loginHistory.length > 10) this.loginHistory.shift();
+  
+  // Ensure arrays exist before pushing
+  if (!Array.isArray(this.loginHistory)) {
+    this.loginHistory = [];
+  }
+  if (!Array.isArray(this.sessions)) {
+    this.sessions = [];
+  }
+  
+  this.loginHistory.push(sessionInfo);
+  // Add to sessions if needed
 };
 
 userSchema.methods.markAsLoggedOut = function () {

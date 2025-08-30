@@ -348,94 +348,80 @@ const handleGoogleCallback = async (code, req) => {
     const avatar = picture?.startsWith('http') ? picture : defaultAvatar;
 
     const sessionInfo = {
-      ip: (req && req.ip) ? req.ip : 'unknown',
-      userAgent: (req && req.headers && req.headers['user-agent'])
-        ? req.headers['user-agent']
-        : 'unknown',
+      ip: req?.ip || 'unknown',
+      userAgent: req?.headers?.['user-agent'] || 'unknown',
       loginTime: new Date()
     };
 
     let user = await User.findOne({ $or: [{ email }, { googleId }] }).session(session);
 
     if (user) {
+      // Update existing user
+      const updateData = {
+        $addToSet: { loginHistory: sessionInfo },
+        $set: { 
+          lastLoginAt: new Date(),
+          isLoggedIn: true
+        }
+      };
+
+      // Add googleId and avatar if missing
       if (!user.googleId) {
-        user = await User.findOneAndUpdate(
-          { _id: user._id },
-          {
-            $set: { googleId, avatar },
-            $addToSet: { loginHistory: sessionInfo },
-            lastLoginAt: new Date()
-          },
-          { new: true, yield: true, session }
-        );
-      } else {
-        user = await User.findOneAndUpdate(
-          { _id: user._id },
-          {
-            $addToSet: { loginHistory: sessionInfo },
-            lastLoginAt: new Date(),
-            isLoggedIn: true
-          },
-          { new: true, yield: true, session }
-        );
+        updateData.$set.googleId = googleId;
+        updateData.$set.avatar = avatar;
       }
 
-      const stats = await UserStats.findOneAndUpdate(
-        { user: user._id },
-        {
-          $set: { lastActive: new Date() },
-          $setOnInsert: {
-            streak: {
-              current: 1,
-              lastUpdated: new Date()
-            }
-          }
-        },
-        {
-          new: true,
-          upsert: true,
-          yield: true,
-          session
-        }
+      user = await User.findOneAndUpdate(
+        { _id: user._id },
+        updateData,
+        { new: true, session } // Removed invalid options
       );
 
-      stats.updateStreak();
-      await stats.save({ session });
-
     } else {
+      // Create new user - FIXED CONSTRUCTOR
       user = new User({
         name,
         email,
         googleId,
         avatar,
         isVerified: true,
-        lastLoginAt: new Date()
-      },{
-        new : true,
-        upsert: true,
-        yield: true,
+        lastLoginAt: new Date(),
+        loginHistory: [sessionInfo], // Initialize array explicitly
+        sessions: [] // Initialize if your schema has this field
       });
-      user.markAsLoggedIn(sessionInfo);
+      
+      // Safe method call
+      if (typeof user.markAsLoggedIn === 'function') {
+        user.markAsLoggedIn(sessionInfo);
+      }
+      
       await user.save({ session });
+    }
 
-      const stats = new UserStats({
-        user: user._id,
-        lastActive: new Date(),
-        streak: {
-          current: 1,
-          lastUpdated: new Date()
+    // Handle UserStats - FIXED
+    const stats = await UserStats.findOneAndUpdate(
+      { user: user._id },
+      {
+        $set: { lastActive: new Date() },
+        $setOnInsert: {
+          streak: {
+            current: 1,
+            lastUpdated: new Date()
+          }
         }
       },
       {
         new: true,
         upsert: true,
-        yield: true,
-        session
-      });
+        session // Removed invalid options
+      }
+    );
+
+    // Safe method call
+    if (stats && typeof stats.updateStreak === 'function') {
+      stats.updateStreak();
       await stats.save({ session });
     }
-
-
 
     const token = generateToken(user);
     const userResponse = user.toObject();
@@ -499,10 +485,8 @@ const handleFacebookCallback = async (code, req) => {
     const userEmail = email || `${facebookId}@facebook.com`;
 
     const sessionInfo = {
-      ip: (req && req.ip) ? req.ip : 'unknown',
-      userAgent: (req && req.headers && req.headers['user-agent'])
-        ? req.headers['user-agent']
-        : 'unknown',
+      ip: req?.ip || 'unknown',
+      userAgent: req?.headers?.['user-agent'] || 'unknown',
       loginTime: new Date()
     };
 
@@ -511,6 +495,7 @@ const handleFacebookCallback = async (code, req) => {
       .session(session);
 
     if (user) {
+      // Update existing user
       const update = {
         $set: {
           lastLoginAt: new Date(),
@@ -526,64 +511,53 @@ const handleFacebookCallback = async (code, req) => {
       user = await User.findOneAndUpdate(
         { _id: user._id },
         update,
-        { new: true, yield: true, session }
+        { new: true, session } // Removed invalid options
       );
-
-      const stats = await UserStats.findOneAndUpdate(
-        { user: user._id },
-        {
-          $set: { lastActive: new Date() },
-          $setOnInsert: {
-            streak: {
-              current: 1,
-              lastUpdated: new Date()
-            }
-          }
-        },
-        {
-          new: true,
-          upsert: true,
-          yield: true,
-          session
-        }
-      );
-
-      stats.updateStreak();
-      await stats.save({ session });
 
     } else {
+      // Create new user - FIXED CONSTRUCTOR
       user = new User({
         name,
         email: userEmail,
         facebookId,
         avatar,
         isVerified: true,
-        lastLoginAt: new Date()
-      },{
-        new : true,
-        upsert: true,
-        yield: true,
+        lastLoginAt: new Date(),
+        loginHistory: [sessionInfo], // Initialize array here
+        sessions: [] // Initialize if your schema has this field
       });
-      user.markAsLoggedIn(sessionInfo);
+      
+      // If markAsLoggedIn is still needed, ensure it handles arrays properly
+      if (typeof user.markAsLoggedIn === 'function') {
+        user.markAsLoggedIn(sessionInfo);
+      }
+      
       await user.save({ session });
+    }
 
-      const stats = new UserStats({
-        user: user._id,
-        lastActive: new Date(),
-        streak: {
-          current: 1,
-          lastUpdated: new Date()
+    // Handle UserStats - FIXED CONSTRUCTOR
+    const stats = await UserStats.findOneAndUpdate(
+      { user: user._id },
+      {
+        $set: { lastActive: new Date() },
+        $setOnInsert: {
+          streak: {
+            current: 1,
+            lastUpdated: new Date()
+          }
         }
       },
       {
         new: true,
         upsert: true,
-        yield: true,
-        session
-      });
+        session // Removed invalid options
+      }
+    );
+
+    if (stats && typeof stats.updateStreak === 'function') {
+      stats.updateStreak();
       await stats.save({ session });
     }
-
 
     const token = generateToken(user);
     const userResponse = user.toObject();
