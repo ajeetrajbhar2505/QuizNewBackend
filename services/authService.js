@@ -10,6 +10,7 @@ const User = require('../models/User');
 const UserStats = require('../models/UserStats');
 const Otp = require('../models/Otp');
 const logger = require('../config/logger');
+const mongoose = require('mongoose');
 
 // Email transporter setup
 const transporter = nodemailer.createTransport({
