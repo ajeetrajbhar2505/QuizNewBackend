@@ -404,13 +404,16 @@ const handleGoogleCallback = async (code, req) => {
 
     } else {
       user = new User({
-        _id: new mongoose.Types.ObjectId(), 
         name,
         email,
         googleId,
         avatar,
         isVerified: true,
         lastLoginAt: new Date()
+      },{
+        new : true,
+        upsert: true,
+        yield: true,
       });
       user.markAsLoggedIn(sessionInfo);
       await user.save({ session });
@@ -550,13 +553,16 @@ const handleFacebookCallback = async (code, req) => {
 
     } else {
       user = new User({
-        _id: new mongoose.Types.ObjectId(), 
         name,
         email: userEmail,
         facebookId,
         avatar,
         isVerified: true,
         lastLoginAt: new Date()
+      },{
+        new : true,
+        upsert: true,
+        yield: true,
       });
       user.markAsLoggedIn(sessionInfo);
       await user.save({ session });

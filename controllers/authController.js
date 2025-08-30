@@ -1,6 +1,5 @@
 const authService = require('../services/authService');
 const logger = require('../config/logger');
-const { getIO } = require('../config/socket');
 
 const register = async (socket, data) => {
   try {
