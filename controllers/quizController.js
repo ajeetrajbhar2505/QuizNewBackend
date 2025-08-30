@@ -96,6 +96,7 @@ const deleteQuiz = async (socket, quizId) => {
   try {
     const quiz = await quizService.deleteQuiz(quizId, socket.user._id);
     socket.emit('quiz:delete:success', { quiz });
+    getIO().emit('refreshpage');
   } catch (error) {
     socket.emit('quiz:delete:error', { error: error.message });
     logger.error(`Get quiz error: ${error.message}`);
@@ -118,6 +119,7 @@ const startWaiting = async (socket, quizId) => {
     const { activeQuiz, notificationMetadata } = await quizService.startWaiting(quizId, socket.user._id);
 
     socket.emit('quiz:waiting:success', { activeQuiz });
+    getIO().emit('refreshpage');
     notificationController.sendBroadcastNotification(socket, { type: 'quiz-invitation', metadata: notificationMetadata })
     logger.info(`Quiz ${quizId} hosted by user ${socket.user._id}`);
   } catch (error) {
