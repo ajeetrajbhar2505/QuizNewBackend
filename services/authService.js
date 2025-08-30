@@ -445,11 +445,39 @@ const handleGoogleCallback = async (code, req) => {
   }
 };
 
-const handleFacebookCallback = async (code, req) => {
+const handleFacebookCallback = async (code, req, maxRetries = 3) => {
+  let lastError;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await executeFacebookAuth(code, req);
+    } catch (error) {
+      lastError = error;
+      
+      if (error.message.includes('Write conflict') || error.message.includes('yielding is disabled')) {
+        // Exponential backoff for retries
+        const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
+        logger.warn(`Write conflict detected, retrying in ${delay}ms (attempt ${attempt}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      
+      // Re-throw immediately for non-retryable errors
+      throw error;
+    }
+  }
+  
+  throw lastError;
+};
+
+const executeFacebookAuth = async (code, req) => {
   const session = await User.startSession();
   session.startTransaction();
 
   try {
+    // ... your existing Facebook auth code ...
+    // BUT remove the invalid options like 'yield: true'
+
     // Exchange code for access token
     const tokenUrl = `https://graph.facebook.com/v19.0/oauth/access_token?` +
       querystring.stringify({
@@ -491,12 +519,12 @@ const handleFacebookCallback = async (code, req) => {
       loginTime: new Date()
     };
 
-    // Find or create user
+    // Find or create user - use transaction retryable options
     let user = await User.findOne({ $or: [{ email: userEmail }, { facebookId }] })
-      .session(session);
+      .session(session)
+      .maxTimeMS(30000); // Add timeout
 
     if (user) {
-      // Update existing user
       const update = {
         $set: {
           lastLoginAt: new Date(),
@@ -512,11 +540,14 @@ const handleFacebookCallback = async (code, req) => {
       user = await User.findOneAndUpdate(
         { _id: user._id },
         update,
-        { new: true, upsert: true, yield: true, session } // Removed invalid options
+        { 
+          new: true, 
+          session,
+          maxTimeMS: 30000 // Add timeout
+        }
       );
 
     } else {
-      // Create new user - FIXED CONSTRUCTOR
       user = new User({
         name,
         email: userEmail,
@@ -524,19 +555,16 @@ const handleFacebookCallback = async (code, req) => {
         avatar,
         isVerified: true,
         lastLoginAt: new Date(),
-        loginHistory: [sessionInfo], // Initialize array here
-        sessions: [] // Initialize if your schema has this field
+        loginHistory: [sessionInfo] // Initialize array
       });
-
-      // If markAsLoggedIn is still needed, ensure it handles arrays properly
-      if (typeof user.markAsLoggedIn === 'function') {
-        user.markAsLoggedIn(sessionInfo);
-      }
-
-      await user.save({ session });
+      
+      await user.save({ 
+        session,
+        maxTimeMS: 30000 // Add timeout
+      });
     }
 
-    // Handle UserStats - FIXED CONSTRUCTOR
+    // UserStats with retryable options
     const stats = await UserStats.findOneAndUpdate(
       { user: user._id },
       {
@@ -551,14 +579,17 @@ const handleFacebookCallback = async (code, req) => {
       {
         new: true,
         upsert: true,
-        yield: true,
-        session // Removed invalid options
+        session,
+        maxTimeMS: 30000 // Add timeout
       }
     );
 
     if (stats && typeof stats.updateStreak === 'function') {
       stats.updateStreak();
-      await stats.save({ session });
+      await stats.save({ 
+        session,
+        maxTimeMS: 30000 
+      });
     }
 
     const token = generateToken(user);
@@ -577,11 +608,9 @@ const handleFacebookCallback = async (code, req) => {
   } catch (error) {
     await session.abortTransaction();
     session.endSession();
-    logger.error(`Facebook authentication failed: ${error.message}`);
-    throw new Error(`Facebook authentication failed: ${error.message}`);
+    throw error;
   }
 };
-
 const sendOtp = async (email) => {
   const session = await User.startSession();
   session.startTransaction();
