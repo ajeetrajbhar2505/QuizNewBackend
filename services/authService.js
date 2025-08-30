@@ -196,7 +196,7 @@ const verifyOtpAndLogin = async (email, otp, verificationToken, req) => {
 
     const sessionInfo = {
       ip: req && req.ipAddress || 'ipAddress',
-      userAgent: req &&  req.userAgent || 'userAgent',
+      userAgent: req && req.userAgent || 'userAgent',
       loginTime: new Date()
     };
 
@@ -359,7 +359,7 @@ const handleGoogleCallback = async (code, req) => {
       // Update existing user
       const updateData = {
         $addToSet: { loginHistory: sessionInfo },
-        $set: { 
+        $set: {
           lastLoginAt: new Date(),
           isLoggedIn: true
         }
@@ -374,7 +374,7 @@ const handleGoogleCallback = async (code, req) => {
       user = await User.findOneAndUpdate(
         { _id: user._id },
         updateData,
-        { new: true, session } // Removed invalid options
+        { new: true, upsert: true, yield: true, session } // Removed invalid options
       );
 
     } else {
@@ -389,12 +389,12 @@ const handleGoogleCallback = async (code, req) => {
         loginHistory: [sessionInfo], // Initialize array explicitly
         sessions: [] // Initialize if your schema has this field
       });
-      
+
       // Safe method call
       if (typeof user.markAsLoggedIn === 'function') {
         user.markAsLoggedIn(sessionInfo);
       }
-      
+
       await user.save({ session });
     }
 
@@ -413,6 +413,7 @@ const handleGoogleCallback = async (code, req) => {
       {
         new: true,
         upsert: true,
+        yield: true,
         session // Removed invalid options
       }
     );
@@ -511,7 +512,7 @@ const handleFacebookCallback = async (code, req) => {
       user = await User.findOneAndUpdate(
         { _id: user._id },
         update,
-        { new: true, session } // Removed invalid options
+        { new: true, upsert: true, yield: true, session } // Removed invalid options
       );
 
     } else {
@@ -526,12 +527,12 @@ const handleFacebookCallback = async (code, req) => {
         loginHistory: [sessionInfo], // Initialize array here
         sessions: [] // Initialize if your schema has this field
       });
-      
+
       // If markAsLoggedIn is still needed, ensure it handles arrays properly
       if (typeof user.markAsLoggedIn === 'function') {
         user.markAsLoggedIn(sessionInfo);
       }
-      
+
       await user.save({ session });
     }
 
@@ -550,6 +551,7 @@ const handleFacebookCallback = async (code, req) => {
       {
         new: true,
         upsert: true,
+        yield: true,
         session // Removed invalid options
       }
     );
