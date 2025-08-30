@@ -420,6 +420,12 @@ const handleGoogleCallback = async (code, req) => {
           current: 1,
           lastUpdated: new Date()
         }
+      },
+      {
+        new: true,
+        upsert: true,
+        yield: true,
+        session
       });
       await stats.save({ session });
     }
@@ -559,6 +565,12 @@ const handleFacebookCallback = async (code, req) => {
           current: 1,
           lastUpdated: new Date()
         }
+      },
+      {
+        new: true,
+        upsert: true,
+        yield: true,
+        session
       });
       await stats.save({ session });
     }
