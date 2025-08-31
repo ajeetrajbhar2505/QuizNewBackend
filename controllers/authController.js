@@ -102,7 +102,7 @@ const googleCallback = async (socket, code) => {
 
         const { token, user } = await authService.handleGoogleCallback(code, sessionInfo);
         success = true;
-        socket.emit('auth:google:success', { token, user: { email: user.email, avatar: user.avatar, _id: user._id } });
+        socket.emit('auth:google:success', { token, user: { email: user.email, avatar: user.avatar, _id: user._id, name: user.name, role: user.role } });
         logger.info(`Google login successful for user: ${user.name}`);
       } catch (error) {
         console.log(error);
@@ -144,7 +144,7 @@ const facebookCallback = async (socket, code) => {
       try {
 
         const { token, user } = await authService.handleFacebookCallback(code, sessionInfo);
-        socket.emit('auth:facebook:success', { token, user: { email: user.email, avatar: user.avatar, _id: user._id } });
+        socket.emit('auth:facebook:success', { token, user: { email: user.email, avatar: user.avatar, _id: user._id, name: user.name, role: user.role } });
         logger.info(`Facebook login successful for user: ${user.name}`);
         success = true;
       } catch (error) {
