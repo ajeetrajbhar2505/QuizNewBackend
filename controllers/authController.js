@@ -26,20 +26,20 @@ const login = async (socket, email) => {
 
 const verifyOtpAndLogin = async (socket, email, otp, verificationToken) => {
   try {
-    
+
     const result = await authService.verifyOtpAndLogin(
-      email, 
-      otp, 
+      email,
+      otp,
       verificationToken
     );
-    
+
     socket.emit('auth:otp:verify:success', {
       token: result.token,
       user: result.user
     });
     logger.info(`OTP verified and user logged in: ${email}`);
   } catch (error) {
-    socket.emit('auth:otp:verify:error', { 
+    socket.emit('auth:otp:verify:error', {
       message: error.message,
       email: email
     });
@@ -48,11 +48,11 @@ const verifyOtpAndLogin = async (socket, email, otp, verificationToken) => {
   }
 };
 
-const logout = async (socket,userId) => {
+const logout = async (socket, userId) => {
   try {
     if (userId) {
       await authService.logoutUser(userId);
-      socket.emit('auth:logout:success'); 
+      socket.emit('auth:logout:success');
       socket.leave(`user_${socket.id}`);
       logger.info(`User logged out: ${userId}`);
     }
@@ -102,7 +102,7 @@ const googleCallback = async (socket, code) => {
 
         const { token, user } = await authService.handleGoogleCallback(code, sessionInfo);
         success = true;
-        socket.emit('auth:google:success', { token, user });
+        socket.emit('auth:google:success', { token, user: { email: user.email, avatar: user.avatar, _id: user._id } });
         logger.info(`Google login successful for user: ${user.name}`);
       } catch (error) {
         console.log(error);
@@ -144,7 +144,7 @@ const facebookCallback = async (socket, code) => {
       try {
 
         const { token, user } = await authService.handleFacebookCallback(code, sessionInfo);
-        socket.emit('auth:facebook:success', { token, user });
+        socket.emit('auth:facebook:success', { token, user: { email: user.email, avatar: user.avatar, _id: user._id } });
         logger.info(`Facebook login successful for user: ${user.name}`);
         success = true;
       } catch (error) {
