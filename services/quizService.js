@@ -179,7 +179,7 @@ const getParticipants = async (quizId) => {
           _id: new ObjectId(quizId)
         }
       },
-
+    
       // Stage 2: Lookup quiz details
       {
         $lookup: {
@@ -190,7 +190,7 @@ const getParticipants = async (quizId) => {
         }
       },
       { $unwind: '$quizDetails' },
-
+    
       // Stage 3: Lookup host details
       {
         $lookup: {
@@ -201,7 +201,7 @@ const getParticipants = async (quizId) => {
         }
       },
       { $unwind: '$hostDetails' },
-
+    
       // Stage 4: Lookup participant details with enhanced pipeline
       {
         $lookup: {
@@ -233,8 +233,8 @@ const getParticipants = async (quizId) => {
           as: 'participantDetails'
         }
       },
-
-      // Stage 5: Merge participant data with their details
+    
+      // Stage 5: Merge participant data with their details and exclude answers
       {
         $addFields: {
           participants: {
@@ -243,7 +243,16 @@ const getParticipants = async (quizId) => {
               as: 'participant',
               in: {
                 $mergeObjects: [
-                  '$$participant',
+                  {
+                    // Only include non-answers fields from participant
+                    _id : '$$participant._id',
+                    user: '$$participant.user',
+                    score: '$$participant.score',
+                    isSubmitted: '$$participant.isSubmitted',
+                    joinedAt: '$$participant.joinedAt',
+                    submittedAt: '$$participant.submittedAt'
+                    // Add other fields you want to keep, but exclude 'answers'
+                  },
                   {
                     $arrayElemAt: [
                       {
@@ -263,7 +272,7 @@ const getParticipants = async (quizId) => {
           participantCount: { $size: '$participants' }
         }
       },
-
+    
       // Stage 6: Project the final structure
       {
         $project: {
