@@ -4,6 +4,7 @@ const setupQuizRoutes = (socket) => {
   socket.on('quiz:create', (data) => quizController.createQuiz(socket, data));
   socket.on('quiz:all', () => quizController.getAllQuiz(socket));
   socket.on('quiz:active', (limit = 0) => quizController.getActiveQuizes(socket,limit));
+  socket.on('quiz:SubmittedQuizes', () => quizController.getSubmittedQuizes(socket));
   socket.on('quiz:get', (quizId) => quizController.getQuiz(socket, quizId));
   socket.on('livequiz:get', (quizId) => quizController.getLiveQuiz(socket, quizId));
   socket.on('quiz:publish', (quizId, publish, approvalStatus) => quizController.publish(socket, quizId, publish, approvalStatus));

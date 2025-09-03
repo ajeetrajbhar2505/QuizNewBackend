@@ -52,7 +52,7 @@ const getAllQuiz = async (userId) => {
         category: 1,
         description: 1,
         estimatedTime: 1,
-        totalPoints : 1,
+        totalPoints: 1,
         source: 1,
         approvalStatus: 1,
         _id: 1
@@ -101,7 +101,7 @@ const getActiveQuizes = async (userId, limit) => {
           participantCount: { $size: '$participants' },
           isParticipant: {
             $in: [
-              new ObjectId(userId), 
+              new ObjectId(userId),
               '$participants.user'
             ]
           },
@@ -137,13 +137,115 @@ const getActiveQuizes = async (userId, limit) => {
           estimatedTime: '$quizDetails.estimatedTime',
           difficulty: '$quizDetails.difficulty',
           totalQuestions: '$quizDetails.totalQuestions',
-          totalPoints : '$quizDetails.totalPoints',
+          totalPoints: '$quizDetails.totalPoints',
           participantCount: 1,
           title: '$quizDetails.title',
           description: '$quizDetails.description',
           quizId: '$quizDetails._id',
-          isParticipant : 1,
-          userSubmissionStatus : 1,
+          isParticipant: 1,
+          userSubmissionStatus: 1,
+          host: {
+            _id: '$hostDetails._id',
+            name: '$hostDetails.name',
+            avatar: '$hostDetails.avatar',
+            email: '$hostDetails.email'
+          }
+        }
+      }
+    ];
+
+
+    // Add $limit stage only if limit > 0
+    if (limit > 0) {
+      pipeline.push({ $limit: limit });
+    }
+
+    const quizzes = await ActiveQuiz.aggregate(pipeline).exec();
+    return quizzes;
+  } catch (error) {
+    console.error('Error fetching active quizzes:', error);
+    throw new Error('Failed to fetch active quizzes: ' + error.message);
+  }
+};
+
+const getSubmittedQuizes = async (userId, limit) => {
+  try {
+    if (!userId) {
+      throw new Error('User ID is required');
+    }
+
+    const pipeline = [
+      {
+        $match: {
+          status: { $in: ['completed'] }
+        }
+      },
+      {
+        $lookup: {
+          from: 'quizzes',
+          localField: 'quiz',
+          foreignField: '_id',
+          as: 'quizDetails'
+        }
+      },
+      { $unwind: '$quizDetails' },
+      {
+        $lookup: {
+          from: 'users',
+          localField: 'host',
+          foreignField: '_id',
+          as: 'hostDetails'
+        }
+      },
+      { $unwind: '$hostDetails' },
+      {
+        $addFields: {
+          participantCount: { $size: '$participants' },
+          isParticipant: {
+            $in: [
+              new ObjectId(userId),
+              '$participants.user'
+            ]
+          },
+          userSubmissionStatus: {
+            $let: {
+              vars: {
+                userParticipant: {
+                  $arrayElemAt: [
+                    {
+                      $filter: {
+                        input: '$participants',
+                        cond: { $eq: ['$$this.user', new ObjectId(userId)] }
+                      }
+                    },
+                    0
+                  ]
+                }
+              },
+              in: {
+                isSubmitted: { $ifNull: ['$$userParticipant.isSubmitted', false] },
+                score: { $ifNull: ['$$userParticipant.score', 0] },
+                status: { $ifNull: ['$$userParticipant.status', 'waiting'] }
+              }
+            }
+          }
+        }
+      },
+      {
+        $project: {
+          status: 1,
+          remainingParticipants: 1,
+          startedAt: 1,
+          estimatedTime: '$quizDetails.estimatedTime',
+          difficulty: '$quizDetails.difficulty',
+          totalQuestions: '$quizDetails.totalQuestions',
+          totalPoints: '$quizDetails.totalPoints',
+          participantCount: 1,
+          title: '$quizDetails.title',
+          description: '$quizDetails.description',
+          quizId: '$quizDetails._id',
+          isParticipant: 1,
+          userSubmissionStatus: 1,
           host: {
             _id: '$hostDetails._id',
             name: '$hostDetails.name',
@@ -169,7 +271,6 @@ const getActiveQuizes = async (userId, limit) => {
 };
 
 
-
 const getParticipants = async (quizId) => {
   try {
     const pipeline = [
@@ -179,7 +280,7 @@ const getParticipants = async (quizId) => {
           _id: new ObjectId(quizId)
         }
       },
-    
+
       // Stage 2: Lookup quiz details
       {
         $lookup: {
@@ -190,7 +291,7 @@ const getParticipants = async (quizId) => {
         }
       },
       { $unwind: '$quizDetails' },
-    
+
       // Stage 3: Lookup host details
       {
         $lookup: {
@@ -201,7 +302,7 @@ const getParticipants = async (quizId) => {
         }
       },
       { $unwind: '$hostDetails' },
-    
+
       // Stage 4: Lookup participant details with enhanced pipeline
       {
         $lookup: {
@@ -233,7 +334,7 @@ const getParticipants = async (quizId) => {
           as: 'participantDetails'
         }
       },
-    
+
       // Stage 5: Merge participant data with their details and exclude answers
       {
         $addFields: {
@@ -245,7 +346,7 @@ const getParticipants = async (quizId) => {
                 $mergeObjects: [
                   {
                     // Only include non-answers fields from participant
-                    _id : '$$participant._id',
+                    _id: '$$participant._id',
                     user: '$$participant.user',
                     score: '$$participant.score',
                     isSubmitted: '$$participant.isSubmitted',
@@ -272,7 +373,7 @@ const getParticipants = async (quizId) => {
           participantCount: { $size: '$participants' }
         }
       },
-    
+
       // Stage 6: Project the final structure
       {
         $project: {
@@ -320,7 +421,7 @@ const getPublishedQuiz = async (userId, limit) => {
         totalQuestions: 1,
         category: 1,
         description: 1,
-        totalPoints:1,
+        totalPoints: 1,
         source: 1,
         estimatedTime: 1,
         approvalStatus: 1,
@@ -445,16 +546,16 @@ const getLiveQuizById = async (quizId) => {
 
   const quiz = await Quiz.findById(quizId);
   if (!quiz) throw new Error('Quiz not found');
-  
+
   // Remove correctAnswer from each question
   const quizWithoutAnswers = {
     ...quiz.toObject(),
     questions: quiz.questions.map(question => {
-      const { correctAnswer,explanation, ...questionWithoutAnswer } = question.toObject();
+      const { correctAnswer, explanation, ...questionWithoutAnswer } = question.toObject();
       return questionWithoutAnswer;
     })
   };
-  
+
   return quizWithoutAnswers;
 };
 
@@ -679,7 +780,7 @@ const submitAnswer = async (quizId, questionId, answer, userId) => {
 
   // Check if user has already answered this question
   const existingAnswerIndex = participant.answers.findIndex(a => a.question.equals(questionId));
-  
+
   const isCorrect = question.correctAnswer === answer;
   const points = isCorrect ? question.points : 0;
 
@@ -694,7 +795,7 @@ const submitAnswer = async (quizId, questionId, answer, userId) => {
     const previousAnswer = participant.answers[existingAnswerIndex];
     statsUpdateData.previousPoints = previousAnswer.points;
     statsUpdateData.previousCorrectness = previousAnswer.isCorrect;
-    
+
     // Update the existing answer
     participant.answers[existingAnswerIndex] = {
       question: questionId,
@@ -720,7 +821,7 @@ const submitAnswer = async (quizId, questionId, answer, userId) => {
   }
 
   participant.endedAt = new Date();
-  
+
   // Save the active quiz first
   await activeQuiz.save();
 
@@ -738,7 +839,7 @@ const submitAnswer = async (quizId, questionId, answer, userId) => {
 const updateUserStats = async (userId, isCorrect, points, statsUpdateData) => {
   const now = new Date();
   const today = new Date(now.setHours(0, 0, 0, 0));
-  
+
   const updateData = {
     $inc: {
       points: points - statsUpdateData.previousPoints
@@ -776,7 +877,7 @@ const updateUserStats = async (userId, isCorrect, points, statsUpdateData) => {
   if (userStats) {
     const lastUpdated = new Date(userStats.streak.lastUpdated);
     const lastUpdatedDate = new Date(lastUpdated.setHours(0, 0, 0, 0));
-    
+
     if (lastUpdatedDate.getTime() === today.getTime()) {
       // Already updated today, no streak change needed
     } else if (lastUpdatedDate.getTime() === today.getTime() - 86400000) {
@@ -789,7 +890,7 @@ const updateUserStats = async (userId, isCorrect, points, statsUpdateData) => {
         ...updateData.$set,
         'streak.lastUpdated': today
       };
-      
+
       // Update longest streak if current exceeds it
       if (userStats.streak.current + 1 > userStats.streak.longest) {
         updateData.$set['streak.longest'] = userStats.streak.current + 1;
@@ -858,7 +959,7 @@ async function transformGeminiResponseToQuiz(geminiResponse, userId) {
     questions: transformedQuestions,
     estimatedTime: geminiResponse.estimatedTime,
     source: geminiResponse.source,
-    totalPoints  : geminiResponse.totalPoints,
+    totalPoints: geminiResponse.totalPoints,
     totalQuestions: geminiResponse.totalQuestions,
     createdBy: userId,
     isAdminCreated: isAdminCreated,
@@ -897,6 +998,7 @@ module.exports = {
   createQuiz,
   getQuizById,
   getLiveQuizById,
+  getSubmittedQuizes,
   startQuiz,
   submitAnswer,
   getAllQuiz,

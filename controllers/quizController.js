@@ -58,6 +58,17 @@ const getActiveQuizes = async (socket, limit) => {
   }
 };
 
+const getSubmittedQuizes = async (socket) => {
+  try {
+    const quizes = await quizService.getSubmittedQuizes(socket.user._id, 0);
+    socket.emit('quiz:SubmittedQuizes:success', { quizes });
+    logger.info(`Quiz all by user ${socket.user._id}`);
+  } catch (error) {
+    socket.emit('quiz:SubmittedQuizes:error', { error: error.message });
+    logger.error(`Get quiz error: ${error.message}`);
+  }
+};
+
 const getParticipants = async (socket, quizId) => {
   try {
     const quiz = await quizService.getParticipants(quizId);
@@ -200,6 +211,7 @@ module.exports = {
   getQuiz,
   getLiveQuiz,
   startQuiz,
+  getSubmittedQuizes,
   submitAnswer,
   getAllQuiz,
   publish,
