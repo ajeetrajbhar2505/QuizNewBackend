@@ -48,21 +48,14 @@ const getLeaderboardUser = async (limit = 0) => {
   try {
 
     const pipeline = [
-      { 
-        $sort: { points: -1 } 
+      {
+        $sort: { points: -1 }
       }
     ];
 
-    if (limit > 0) {
-      pipeline.push({ 
-        $limit: limit
-      });
-    }
-
-
     pipeline.push(
       {
-        $lookup: { 
+        $lookup: {
           from: 'users',
           localField: 'user',
           foreignField: '_id',
@@ -70,10 +63,10 @@ const getLeaderboardUser = async (limit = 0) => {
         }
       },
       {
-        $unwind: '$userData' 
+        $unwind: '$userData'
       },
       {
-        $project: { 
+        $project: {
           userId: '$user',
           name: '$userData.name',
           avatar: '$userData.avatar',
@@ -84,9 +77,15 @@ const getLeaderboardUser = async (limit = 0) => {
       }
     );
 
+    if (limit > 0) {
+      pipeline.push({
+        $limit: limit
+      });
+    }
+
     const topStats = await UserStats.aggregate(pipeline);
     return topStats
-    
+
   } catch (error) {
     console.error('Error fetching leadership board:', error);
     throw new Error('Failed to retrieve leadership data');
