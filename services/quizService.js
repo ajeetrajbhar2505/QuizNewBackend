@@ -829,6 +829,7 @@ const submitAnswer = async (quizId, questionId, answer, userId) => {
   await updateUserStats(userId, isCorrect, points, statsUpdateData);
 
   return {
+    correctAnswer : question.correctAnswer,
     isCorrect,
     points,
     currentScore: participant.score,
