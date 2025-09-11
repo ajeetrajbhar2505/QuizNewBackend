@@ -53,7 +53,6 @@ const createAuthHandlers = (getIO) => {
       if (userId) {
         await authService.logoutUser(userId);
         getIO().to(`user_${socket.id}`).emit('auth:logout:success');
-        socket.leave(`user_${socket.id}`);
         logger.info(`User logged out: ${userId}`);
       }
     } catch (error) {
