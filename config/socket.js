@@ -23,6 +23,7 @@ const initSocket = (server) => {
     socket.join(`user_${socket.id}`);
 
     // Register unauthenticated handlers
+    socket.on('auth:logout', (data) => authHandlers.logout(socket, data));
     socket.on('auth:register', (data) => authHandlers.register(socket, data));
     socket.on('auth:login', (email) => authHandlers.login(socket, email));
     socket.on('auth:google:login', () => authHandlers.googleLogin(socket));
