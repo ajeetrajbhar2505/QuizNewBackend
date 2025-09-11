@@ -63,7 +63,7 @@ const createAuthHandlers = (getIO) => {
 
   const googleLogin = async (socket) => {
     try {
-      const url = await authService.generateGoogleAuthUrl();
+      const url = await authService.generateGoogleAuthUrl(socket.id);
       getIO().to(`user_${socket.id}`).emit('auth:google:url', { url });
       logger.info('Google auth URL generated');
     } catch (error) {
@@ -74,7 +74,7 @@ const createAuthHandlers = (getIO) => {
 
   const facebookLogin = async (socket) => {
     try {
-      const url = await authService.generateFacebookAuthUrl();
+      const url = await authService.generateFacebookAuthUrl(socket.id);
       getIO().to(`user_${socket.id}`).emit('auth:facebook:url', { url });
       logger.info('Facebook auth URL generated');
     } catch (error) {
@@ -83,7 +83,7 @@ const createAuthHandlers = (getIO) => {
     }
   };
 
-  const googleCallback = async (socket, code) => {
+  const googleCallback = async (socket, code, state) => {
     try {
       const maxRetries = 3;
       let retryCount = 0;
@@ -99,7 +99,7 @@ const createAuthHandlers = (getIO) => {
         try {
           const { token, user } = await authService.handleGoogleCallback(code, sessionInfo);
           success = true;
-          getIO().to(`user_${socket.id}`).emit('auth:google:success', { token, user: { email: user.email, avatar: user.avatar, _id: user._id, name: user.name, role: user.role } });
+          getIO().to(`user_${state}`).emit('auth:google:success', { token, user: { email: user.email, avatar: user.avatar, _id: user._id, name: user.name, role: user.role } });
           logger.info(`Google login successful for user: ${user.name}`);
         } catch (error) {
           console.log(error);
@@ -117,14 +117,14 @@ const createAuthHandlers = (getIO) => {
     } catch (error) {
       logger.error(`Google callback error: ${error.message}`);
       console.log(error);
-      getIO().to(`user_${socket.id}`).emit('auth:google:error', {
+      getIO().to(`user_${state}`).emit('auth:google:error', {
         message: 'Authentication failed. Please try again.',
         retryable: false
       });
     }
   };
 
-  const facebookCallback = async (socket, code) => {
+  const facebookCallback = async (socket, code, state) => {
     try {
       const maxRetries = 3;
       let retryCount = 0;
@@ -139,7 +139,7 @@ const createAuthHandlers = (getIO) => {
       while (retryCount < maxRetries && !success) {
         try {
           const { token, user } = await authService.handleFacebookCallback(code, sessionInfo);
-          getIO().to(`user_${socket.id}`).emit('auth:facebook:success', { token, user: { email: user.email, avatar: user.avatar, _id: user._id, name: user.name, role: user.role } });
+          getIO().to(`user_${state}`).emit('auth:facebook:success', { token, user: { email: user.email, avatar: user.avatar, _id: user._id, name: user.name, role: user.role } });
           logger.info(`Facebook login successful for user: ${user.name}`);
           success = true;
         } catch (error) {
@@ -157,7 +157,7 @@ const createAuthHandlers = (getIO) => {
     } catch (error) {
       logger.error('Facebook callback error:', error);
       console.log(error);
-      getIO().to(`user_${socket.id}`).emit('auth:facebook:error', {
+      getIO().to(`user_${state}`).emit('auth:facebook:error', {
         message: 'Authentication failed. Please try again.',
         retryable: false
       });

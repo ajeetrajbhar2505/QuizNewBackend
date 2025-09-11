@@ -317,16 +317,17 @@ const logoutUser = async (userId) => {
   await user.save();
 };
 
-const generateGoogleAuthUrl = async () => {
+const generateGoogleAuthUrl = async (socketId) => {
   return await googleClient.generateAuthUrl({
     access_type: 'offline',
     scope: ['https://www.googleapis.com/auth/userinfo.profile', 'https://www.googleapis.com/auth/userinfo.email'],
-    prompt: 'select_account'
+    prompt: 'select_account',
+    state: socketId 
   });
 };
 
-const generateFacebookAuthUrl = () => {
-  return `https://www.facebook.com/v19.0/dialog/oauth?client_id=${process.env.FACEBOOK_APP_ID}&redirect_uri=${encodeURIComponent(process.env.FACEBOOK_REDIRECT_URI)}&scope=email,public_profile&response_type=code&auth_type=rerequest`;
+const generateFacebookAuthUrl = (socketId) => {
+  return `https://www.facebook.com/v19.0/dialog/oauth?client_id=${process.env.FACEBOOK_APP_ID}&redirect_uri=${encodeURIComponent(process.env.FACEBOOK_REDIRECT_URI)}&scope=email,public_profile&response_type=code&auth_type=rerequest&state=${encodeURIComponent(socketId)}`;
 };
 
 const handleGoogleCallback = async (code, req) => {
