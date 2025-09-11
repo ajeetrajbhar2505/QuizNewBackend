@@ -1,13 +1,14 @@
 const authService = require('../services/authService');
 const logger = require('../config/logger');
+const { getIO } = require('../config/socket');
 
 const register = async (socket, data) => {
   try {
     const result = await authService.registerUser(data);
-    socket.emit('auth:register:success', result);
+    getIO().to(`user_${socket.id}`).emit('auth:register:success', result);
     logger.info(`User registered: ${data.email}`);
   } catch (error) {
-    socket.emit('auth:register:error', { message: error.message });
+    getIO().to(`user_${socket.id}`).emit('auth:register:error', { message: error.message });
     logger.error(`Registration error: ${error.message}`);
   }
 };
@@ -15,10 +16,10 @@ const register = async (socket, data) => {
 const login = async (socket, email) => {
   try {
     const result = await authService.loginWithOtp(email);
-    socket.emit('auth:login:success', result);
+    getIO().to(`user_${socket.id}`).emit('auth:login:success', result);
     logger.info(`User logged in: ${email}`);
   } catch (error) {
-    socket.emit('auth:login:error', { message: error.message });
+    getIO().to(`user_${socket.id}`).emit('auth:login:error', { message: error.message });
     console.log(error);
     logger.error(`Login error: ${error.message}`);
   }
@@ -33,13 +34,13 @@ const verifyOtpAndLogin = async (socket, email, otp, verificationToken) => {
       verificationToken
     );
 
-    socket.emit('auth:otp:verify:success', {
+    getIO().to(`user_${socket.id}`).emit('auth:otp:verify:success', {
       token: result.token,
       user: result.user
     });
     logger.info(`OTP verified and user logged in: ${email}`);
   } catch (error) {
-    socket.emit('auth:otp:verify:error', {
+    getIO().to(`user_${socket.id}`).emit('auth:otp:verify:error', {
       message: error.message,
       email: email
     });
@@ -52,12 +53,12 @@ const logout = async (socket, userId) => {
   try {
     if (userId) {
       await authService.logoutUser(userId);
-      socket.emit('auth:logout:success');
+      getIO().to(`user_${socket.id}`).emit('auth:logout:success');
       socket.leave(`user_${socket.id}`);
       logger.info(`User logged out: ${userId}`);
     }
   } catch (error) {
-    socket.emit('auth:logout:error', { message: error.message });
+    getIO().to(`user_${socket.id}`).emit('auth:logout:error', { message: error.message });
     logger.error(`Logout error: ${error.message}`);
   }
 };
@@ -65,10 +66,10 @@ const logout = async (socket, userId) => {
 const googleLogin = async (socket) => {
   try {
     const url = await authService.generateGoogleAuthUrl();
-    socket.emit('auth:google:url', { url });
+    getIO().to(`user_${socket.id}`).emit('auth:google:url', { url });
     logger.info('Google auth URL generated');
   } catch (error) {
-    socket.emit('auth:google:error', { message: error.message });
+    getIO().to(`user_${socket.id}`).emit('auth:google:error', { message: error.message });
     logger.error(`Google auth error: ${error.message}`);
   }
 };
@@ -76,10 +77,10 @@ const googleLogin = async (socket) => {
 const facebookLogin = async (socket) => {
   try {
     const url = await authService.generateFacebookAuthUrl();
-    socket.emit('auth:facebook:url', { url });
+    getIO().to(`user_${socket.id}`).emit('auth:facebook:url', { url });
     logger.info('Facebook auth URL generated');
   } catch (error) {
-    socket.emit('auth:facebook:error', { message: error.message });
+    getIO().to(`user_${socket.id}`).emit('auth:facebook:error', { message: error.message });
     logger.error(`Facebook auth error: ${error.message}`);
   }
 };
@@ -102,7 +103,7 @@ const googleCallback = async (socket, code) => {
 
         const { token, user } = await authService.handleGoogleCallback(code, sessionInfo);
         success = true;
-        socket.emit('auth:google:success', { token, user: { email: user.email, avatar: user.avatar, _id: user._id, name: user.name, role: user.role } });
+        getIO().to(`user_${socket.id}`).emit('auth:google:success', { token, user: { email: user.email, avatar: user.avatar, _id: user._id, name: user.name, role: user.role } });
         logger.info(`Google login successful for user: ${user.name}`);
       } catch (error) {
         console.log(error);
@@ -120,7 +121,7 @@ const googleCallback = async (socket, code) => {
   } catch (error) {
     logger.error(`Google callback error: ${error.message}`);
     console.log(error);
-    socket.emit('auth:google:error', {
+    getIO().to(`user_${socket.id}`).emit('auth:google:error', {
       message: 'Authentication failed. Please try again.',
       retryable: false
     });
@@ -144,7 +145,7 @@ const facebookCallback = async (socket, code) => {
       try {
 
         const { token, user } = await authService.handleFacebookCallback(code, sessionInfo);
-        socket.emit('auth:facebook:success', { token, user: { email: user.email, avatar: user.avatar, _id: user._id, name: user.name, role: user.role } });
+        getIO().to(`user_${socket.id}`).emit('auth:facebook:success', { token, user: { email: user.email, avatar: user.avatar, _id: user._id, name: user.name, role: user.role } });
         logger.info(`Facebook login successful for user: ${user.name}`);
         success = true;
       } catch (error) {
@@ -162,7 +163,7 @@ const facebookCallback = async (socket, code) => {
   } catch (error) {
     logger.error('Facebook callback error:', error);
     console.log(error);
-    socket.emit('auth:facebook:error', {
+    getIO().to(`user_${socket.id}`).emit('auth:facebook:error', {
       message: 'Authentication failed. Please try again.',
       retryable: false
     });
@@ -172,10 +173,10 @@ const facebookCallback = async (socket, code) => {
 const sendOTP = async (socket, email) => {
   try {
     const result = await authService.sendOtp(email);
-    socket.emit('auth:otp:send:success', result);
+    getIO().to(`user_${socket.id}`).emit('auth:otp:send:success', result);
     logger.info(`OTP sent to: ${email}`);
   } catch (error) {
-    socket.emit('auth:otp:send:error', { message: error.message });
+    getIO().to(`user_${socket.id}`).emit('auth:otp:send:error', { message: error.message });
     logger.error(`OTP send error: ${error.message}`);
   }
 };
@@ -187,10 +188,10 @@ const verifyOTP = async (socket, data) => {
       userAgent: socket.handshake.headers['user-agent']
     };
     const result = await authService.verifyOtp(data.email, data.otp, sessionInfo);
-    socket.emit('auth:otp:verify:success', result);
+    getIO().to(`user_${socket.id}`).emit('auth:otp:verify:success', result);
     logger.info(`OTP verified for: ${data.email}`);
   } catch (error) {
-    socket.emit('auth:otp:verify:error', { message: error.message });
+    getIO().to(`user_${socket.id}`).emit('auth:otp:verify:error', { message: error.message });
     logger.error(`OTP verify error: ${error.message}`);
   }
 };
