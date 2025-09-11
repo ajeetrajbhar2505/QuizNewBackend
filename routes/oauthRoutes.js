@@ -49,6 +49,7 @@ router.get('/auth/google/callback', async (req, res) => {
         </div>
     
         <script>
+            window.close(); 
             function attemptClose() {
                 // Only works if the page was opened via window.open()
                 try { window.close(); } 
@@ -101,6 +102,7 @@ router.get('/auth/google/callback', async (req, res) => {
         </div>
     
         <script>
+            window.close(); 
             function attemptClose() {
                 // Only works if the page was opened via window.open()
                 try { window.close(); } 
