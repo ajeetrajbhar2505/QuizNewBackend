@@ -547,16 +547,7 @@ const getLiveQuizById = async (quizId) => {
   const quiz = await Quiz.findById(quizId);
   if (!quiz) throw new Error('Quiz not found');
 
-  // Remove correctAnswer from each question
-  const quizWithoutAnswers = {
-    ...quiz.toObject(),
-    questions: quiz.questions.map(question => {
-      const { correctAnswer, explanation, ...questionWithoutAnswer } = question.toObject();
-      return questionWithoutAnswer;
-    })
-  };
-
-  return quizWithoutAnswers;
+  return quiz;
 };
 
 // Start waiting period for quiz
@@ -829,7 +820,6 @@ const submitAnswer = async (quizId, questionId, answer, userId) => {
   await updateUserStats(userId, isCorrect, points, statsUpdateData);
 
   return {
-    correctAnswer : question.correctAnswer,
     isCorrect,
     points,
     currentScore: participant.score,
