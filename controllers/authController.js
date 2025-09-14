@@ -16,10 +16,10 @@ const createAuthHandlers = (getIO) => {
   const login = async (socket, email) => {
     try {
       const result = await authService.loginWithOtp(email);
-      getIO().to(`user_${socket.id}`).emit('auth:login:success', result);
+      socket.emit('auth:login:success', result);
       logger.info(`User logged in: ${email}`);
     } catch (error) {
-      getIO().to(`user_${socket.id}`).emit('auth:login:error', { message: error.message });
+      socket.emit('auth:login:error', { message: error.message });
       console.log(error);
       logger.error(`Login error: ${error.message}`);
     }
@@ -33,13 +33,13 @@ const createAuthHandlers = (getIO) => {
         verificationToken
       );
 
-      getIO().to(`user_${socket.id}`).emit('auth:otp:verify:success', {
+      socket.emit('auth:otp:verify:success', {
         token: result.token,
         user: result.user
       });
       logger.info(`OTP verified and user logged in: ${email}`);
     } catch (error) {
-      getIO().to(`user_${socket.id}`).emit('auth:otp:verify:error', {
+      socket.emit('auth:otp:verify:error', {
         message: error.message,
         email: email
       });
