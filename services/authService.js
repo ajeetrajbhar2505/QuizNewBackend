@@ -77,8 +77,8 @@ const loginWithOtp = async (email) => {
 
     // Generate OTP
     const otp = otpGenerator.generate(6, {
-      upperCaseAlphabets: false,
-      specialChars: false,
+      upperCaseAlphabets: true,
+      specialChars: true,
       digits: true
     });
 
@@ -96,7 +96,7 @@ const loginWithOtp = async (email) => {
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: email,
-      subject: `${otp} - QuizGame Sign-in Verification`,
+      subject: `${otp} - QuizGame Sign-in Verification Code`,
       html: `
 
 
@@ -649,7 +649,7 @@ const sendOtp = async (email) => {
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: email,
-      subject: `${otp} - QuizGame Sign-in Verification`,
+      subject: `${otp} - QuizGame Sign-in Verification Code`,
       html: `
    
 
