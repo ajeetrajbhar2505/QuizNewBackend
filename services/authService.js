@@ -124,7 +124,7 @@ const loginWithOtp = async (email) => {
         <p style="font-size: 14px; color: #7f8c8d; margin-bottom: 5px;">Need help?</p>
         <p style="font-size: 14px; margin: 0;">
           Contact our support team at 
-          <a href="mailto:ajit.career@gmail.com" style="color: #3498db; text-decoration: none;">support@ajit.career@gmail.com</a>
+          <a href="mailto:ajitrajbhar.career@gmail.com" style="color: #3498db; text-decoration: none;">ajitrajbhar.career@gmail.com</a>
         </p>
       </div>
     </div>
@@ -677,7 +677,7 @@ const sendOtp = async (email) => {
     <p style="font-size: 14px; color: #7f8c8d; margin-bottom: 5px;">Need help?</p>
     <p style="font-size: 14px; margin: 0;">
       Contact our support team at 
-      <a href="mailto:ajit.career@gmail.com" style="color: #3498db; text-decoration: none;">support@ajit.career@gmail.com</a>
+      <a href="mailto:ajitrajbhar.career@gmail.com" style="color: #3498db; text-decoration: none;">ajitrajbhar.career@gmail.com</a>
     </p>
   </div>
 </div>
