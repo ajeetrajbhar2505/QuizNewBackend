@@ -92,10 +92,11 @@ const loginWithOtp = async (email) => {
       expiresAt: new Date(Date.now() + 5 * 60 * 1000) // 5 minutes expiry
     }).save({ session });
 
+
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: email,
-      subject: 'Quiz App OTP Code',
+      subject: `${otp} - QuizGame Sign-in Verification`,
       html: `
 
 
@@ -648,7 +649,7 @@ const sendOtp = async (email) => {
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: email,
-      subject: 'Quiz App OTP Code',
+      subject: `${otp} - QuizGame Sign-in Verification`,
       html: `
    
 
@@ -772,6 +773,32 @@ const verifyOtp = async (email, otp, verificationToken, req) => {
 
     await session.commitTransaction();
     session.endSession();
+
+       // Handle UserStats - FIXED
+       const stats = await UserStats.findOneAndUpdate(
+        { user: user._id },
+        {
+          $set: { lastActive: new Date() },
+          $setOnInsert: {
+            streak: {
+              current: 1,
+              lastUpdated: new Date()
+            }
+          }
+        },
+        {
+          new: true,
+          upsert: true,
+          yield: true,
+          session // Removed invalid options
+        }
+      );
+  
+      // Safe method call
+      if (stats && typeof stats.updateStreak === 'function') {
+        stats.updateStreak();
+        await stats.save({ session });
+      }
 
     return {
       success: true,
