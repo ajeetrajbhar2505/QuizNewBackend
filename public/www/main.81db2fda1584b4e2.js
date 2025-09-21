@@ -424,7 +424,8 @@ _AppRoutingModule.ɵinj = /*@__PURE__*/_angular_core__WEBPACK_IMPORTED_MODULE_16
   providers: [_quiz_guard_service__WEBPACK_IMPORTED_MODULE_14__.QuizGuardService] // Add the guard to providers
   ,
   imports: [_angular_router__WEBPACK_IMPORTED_MODULE_17__.RouterModule.forRoot(routes, {
-    preloadingStrategy: _angular_router__WEBPACK_IMPORTED_MODULE_17__.PreloadAllModules
+    preloadingStrategy: _angular_router__WEBPACK_IMPORTED_MODULE_17__.PreloadAllModules,
+    useHash: true
   }), _angular_router__WEBPACK_IMPORTED_MODULE_17__.RouterModule]
 });
 (function () {
@@ -8027,4 +8028,4 @@ module.exports = webpackEmptyAsyncContext;
 /******/ var __webpack_exports__ = __webpack_require__.O();
 /******/ }
 ]);
-//# sourceMappingURL=main.a9848c3e538f7297.js.map
+//# sourceMappingURL=main.81db2fda1584b4e2.js.map
