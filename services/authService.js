@@ -76,12 +76,12 @@ const loginWithOtp = async (email) => {
     if (!user) throw new Error('User not found');
 
     // Generate OTP
-    const otp = otpGenerator.generate(6, {
-      upperCaseAlphabets: true,
-      specialChars: true,
-      digits: true
+    const otp = otpGenerator.generate(5, {
+      digits: true,
+      upperCaseAlphabets: false,
+      lowerCaseAlphabets: false, 
+      specialChars: false,
     });
-
     const token = crypto.randomBytes(32).toString('hex');
 
     await Otp.deleteMany({ email }).session(session);
@@ -323,7 +323,7 @@ const generateGoogleAuthUrl = async (socketId) => {
     access_type: 'offline',
     scope: ['https://www.googleapis.com/auth/userinfo.profile', 'https://www.googleapis.com/auth/userinfo.email'],
     prompt: 'select_account',
-    state: socketId 
+    state: socketId
   });
 };
 
@@ -343,119 +343,59 @@ const handleGoogleCallback = async (code, req) => {
     });
 
     const payload = ticket.getPayload();
-    if (!payload) throw new Error('Invalid Google token payload');
-
     const { email, name, picture, sub: googleId } = payload;
-    const defaultAvatar = 'https://quiznewbackend.onrender.com/profile.jpg';
-    const avatar = picture?.startsWith('http') ? picture : defaultAvatar;
+    const sessionInfo = { ip: req?.ip || 'unknown', loginTime: new Date() };
 
-    const sessionInfo = {
-      ip: req?.ip || 'unknown',
-      userAgent: req?.headers?.['user-agent'] || 'unknown',
-      loginTime: new Date()
-    };
-
-    let user = await User.findOne({ $or: [{ email }, { googleId }] }).session(session);
-
-    if (user) {
-      // Update existing user
-      const updateData = {
-        $addToSet: { loginHistory: sessionInfo },
-        $set: {
-          lastLoginAt: new Date(),
-          isLoggedIn: true
-        }
-      };
-
-      // Add googleId and avatar if missing
-      if (!user.googleId) {
-        updateData.$set.googleId = googleId;
-        updateData.$set.avatar = avatar;
-      }
-
-      user = await User.findOneAndUpdate(
-        { _id: user._id },
-        updateData,
-        { new: true, upsert: true, yield: true, session } // Removed invalid options
-      );
-
-    } else {
-      // Create new user - FIXED CONSTRUCTOR
-      user = new User({
-        name,
-        email,
-        googleId,
-        avatar,
-        isVerified: true,
-        lastLoginAt: new Date(),
-        loginHistory: [sessionInfo], // Initialize array explicitly
-        sessions: [] // Initialize if your schema has this field
-      });
-
-      // Safe method call
-      if (typeof user.markAsLoggedIn === 'function') {
-        user.markAsLoggedIn(sessionInfo);
-      }
-
-      await user.save({ session });
-    }
-
-    // Handle UserStats - FIXED
-    const stats = await UserStats.findOneAndUpdate(
-      { user: user._id },
-      {
-        $set: { lastActive: new Date() },
-        $setOnInsert: {
-          streak: {
-            current: 1,
-            lastUpdated: new Date()
-          }
-        }
+    // Use findOneAndUpdate with upsert for an atomic "Update or Add"
+    const user = await User.findOneAndUpdate(
+      { email }, // Filter
+      { 
+        $set: { 
+          name, 
+          googleId, 
+          avatar: picture, 
+          isVerified: true, 
+          lastLoginAt: new Date(), 
+          isLoggedIn: true 
+        },
+        $addToSet: { loginHistory: sessionInfo } // Append to history if unique
       },
-      {
-        new: true,
-        upsert: true,
-        yield: true,
-        session // Removed invalid options
+      { 
+        upsert: true, 
+        new: true, // Return the updated/new document
+        runValidators: true, 
+        session 
       }
     );
 
-    // Safe method call
-    if (stats && typeof stats.updateStreak === 'function') {
-      stats.updateStreak();
-      await stats.save({ session });
-    }
-
-    const token = generateToken(user);
-    const userResponse = user.toObject();
+    // Update stats atomically
+    await UserStats.findOneAndUpdate(
+      { user: user._id },
+      { $set: { lastActive: new Date() }, $setOnInsert: { "streak.current": 1 } },
+      { upsert: true, session }
+    );
 
     await session.commitTransaction();
-    session.endSession();
-
-    logger.info(`Google login successful for user: ${email}`);
-    return {
-      success: true,
-      token,
-      user: userResponse
-    };
+    return { success: true, token: generateToken(user), user };
 
   } catch (error) {
     await session.abortTransaction();
+    throw error;
+  } finally {
     session.endSession();
-    logger.error(`Google callback error: ${error.message}`);
-    throw new Error('Google authentication failed');
   }
 };
 
+
 const handleFacebookCallback = async (code, req, maxRetries = 3) => {
   let lastError;
-  
+
   for (let attempt = 1; attempt <= maxRetries; attempt++) {
     try {
       return await executeFacebookAuth(code, req);
     } catch (error) {
       lastError = error;
-      
+
       if (error.message.includes('Write conflict') || error.message.includes('yielding is disabled')) {
         // Exponential backoff for retries
         const delay = Math.pow(2, attempt) * 1000 + Math.random() * 1000;
@@ -463,12 +403,12 @@ const handleFacebookCallback = async (code, req, maxRetries = 3) => {
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
-      
+
       // Re-throw immediately for non-retryable errors
       throw error;
     }
   }
-  
+
   throw lastError;
 };
 
@@ -542,8 +482,8 @@ const executeFacebookAuth = async (code, req) => {
       user = await User.findOneAndUpdate(
         { _id: user._id },
         update,
-        { 
-          new: true, 
+        {
+          new: true,
           session,
           maxTimeMS: 30000 // Add timeout
         }
@@ -559,8 +499,8 @@ const executeFacebookAuth = async (code, req) => {
         lastLoginAt: new Date(),
         loginHistory: [sessionInfo] // Initialize array
       });
-      
-      await user.save({ 
+
+      await user.save({
         session,
         maxTimeMS: 30000 // Add timeout
       });
@@ -588,9 +528,9 @@ const executeFacebookAuth = async (code, req) => {
 
     if (stats && typeof stats.updateStreak === 'function') {
       stats.updateStreak();
-      await stats.save({ 
+      await stats.save({
         session,
-        maxTimeMS: 30000 
+        maxTimeMS: 30000
       });
     }
 
@@ -625,10 +565,11 @@ const sendOtp = async (email) => {
     }
 
     // Generate OTP
-    const otp = otpGenerator.generate(6, {
+    const otp = otpGenerator.generate(5, {
+      digits: true,
       upperCaseAlphabets: false,
       specialChars: false,
-      digits: true
+      specialChars: false
     });
 
     // Generate verification token
@@ -774,31 +715,31 @@ const verifyOtp = async (email, otp, verificationToken, req) => {
     await session.commitTransaction();
     session.endSession();
 
-       // Handle UserStats - FIXED
-       const stats = await UserStats.findOneAndUpdate(
-        { user: user._id },
-        {
-          $set: { lastActive: new Date() },
-          $setOnInsert: {
-            streak: {
-              current: 1,
-              lastUpdated: new Date()
-            }
+    // Handle UserStats - FIXED
+    const stats = await UserStats.findOneAndUpdate(
+      { user: user._id },
+      {
+        $set: { lastActive: new Date() },
+        $setOnInsert: {
+          streak: {
+            current: 1,
+            lastUpdated: new Date()
           }
-        },
-        {
-          new: true,
-          upsert: true,
-          yield: true,
-          session // Removed invalid options
         }
-      );
-  
-      // Safe method call
-      if (stats && typeof stats.updateStreak === 'function') {
-        stats.updateStreak();
-        await stats.save({ session });
+      },
+      {
+        new: true,
+        upsert: true,
+        yield: true,
+        session // Removed invalid options
       }
+    );
+
+    // Safe method call
+    if (stats && typeof stats.updateStreak === 'function') {
+      stats.updateStreak();
+      await stats.save({ session });
+    }
 
     return {
       success: true,
