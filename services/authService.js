@@ -103,7 +103,7 @@ const loginWithOtp = async (email) => {
 
 
     await transporter.sendMail({
-      from: process.env.EMAIL_USER,
+      from: process.env.EMAIL_NOREPLY,
       to: email,
       subject: `${otp} - QuizGame Sign-in Verification Code`,
       html: `
@@ -597,7 +597,7 @@ const sendOtp = async (email) => {
 
 
     await transporter.sendMail({
-      from: process.env.EMAIL_USER,
+      from: process.env.EMAIL_NOREPLY,
       to: email,
       subject: `${otp} - QuizGame Sign-in Verification Code`,
       html: `
