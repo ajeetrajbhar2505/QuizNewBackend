@@ -13,14 +13,23 @@ const logger = require('../config/logger');
 const mongoose = require('mongoose');
 
 // Email transporter setup
+// Example configuration that might need adjustment
 const transporter = nodemailer.createTransport({
   service: "gmail",
+  port: 587, // Try 465 for SSL or 587 for TLS
+  secure: false, // true for 465, false for other ports
   auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD,
+    user: process.env.EMAIL_USER, // Use environment variables!
+    pass: process.env.EMAIL_PASSWORD
   },
+  // Add these for better cloud compatibility
+  tls: {
+    rejectUnauthorized: false // Caution: Only for development/testing
+  },
+  connectionTimeout: 10000, // 10 seconds
+  greetingTimeout: 10000,
+  socketTimeout: 10000
 });
-
 const googleClient = new OAuth2Client(
   process.env.GOOGLE_CLIENT_ID,
   process.env.GOOGLE_CLIENT_SECRET,
