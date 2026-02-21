@@ -7,6 +7,12 @@ const { ObjectId } = require('mongoose').Types;
 const notificationController = require('../controllers/notificationController');
 const UserStats = require('../models/UserStats');
 
+const askQuestion = async (prompt) => {
+  const geminiResponse = await AimlQuizService.askQuestion(prompt);
+  return geminiResponse;
+};
+
+
 const createQuiz = async (data, userId) => {
   const geminiResponse = await AimlQuizService.generateQuiz(data.prompt);
   const quizDoc = await transformGeminiResponseToQuiz(geminiResponse, userId);
@@ -1002,5 +1008,6 @@ module.exports = {
   joinQuiz,
   startWaiting,
   getActiveQuizes,
-  getParticipants
+  getParticipants,
+  askQuestion
 };

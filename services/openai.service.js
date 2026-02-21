@@ -9,6 +9,35 @@ class AIService {
    * @param {object} options - Generation options
    * @returns {Promise<object>} Raw Gemini response with quiz data
    */
+
+
+  static async askQuestion(prompt) {
+    try {
+      const result = await model.generateContent({
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: prompt }]
+          }
+        ],
+        generationConfig: {
+          temperature: 0.2,        // IMPORTANT: reduce hallucination
+          topP: 0.8,
+          maxOutputTokens: 2048
+        }
+      });
+
+      const responseText = result.response.text();
+
+      return responseText
+
+    } catch (error) {
+      console.error("Gemini API error:", error.message);
+      return [];
+    }
+  }
+
+
   static async generateQuiz(userPrompt, options = {}) {
     try {
       // 1. Validate and parse input
@@ -68,6 +97,7 @@ class AIService {
   /**
    * Parses user prompt into structured data
    */
+
   static async _parseUserPrompt(userPrompt, options = {}) {
     const promptString = String(userPrompt || '').trim();
 

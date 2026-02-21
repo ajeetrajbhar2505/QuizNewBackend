@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const authService = require('../services/authService');
+const quizService = require('../services/quizService');
 const logger = require('../config/logger');
 const { getIO } = require('../config/socket');
 
@@ -230,6 +231,16 @@ router.post('/auth/login', async (req, res) => {
         res.send(result)
     } catch (error) {
         logger.error(`Login auth error: ${error.message}`);
+    };
+})
+
+router.post('/askQuestion', async (req, res) => {
+    try {
+        const { prompt } = req.body
+        const result = await quizService.askQuestion(prompt);
+        res.send(result)
+    } catch (error) {
+        logger.error(`prompt error: ${error.message}`);
     };
 })
 
